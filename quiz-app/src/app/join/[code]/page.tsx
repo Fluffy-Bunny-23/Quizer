@@ -32,7 +32,7 @@ export default function JoinGame() {
           setError('Game not found. Check the code and try again.');
           setSessionValid(false);
         } else if (session.status !== 'lobby') {
-          setError('This game has already started.');
+          setError('This game is no longer accepting players.');
           setSessionValid(false);
         } else {
           setSessionValid(true);
