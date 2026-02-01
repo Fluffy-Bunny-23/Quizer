@@ -142,12 +142,12 @@ export default function Home() {
                 maxLength={8}
                 className="input flex-1 text-center text-xl font-mono tracking-widest uppercase"
                 onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
+                aria-label="Enter game code"
               />
               <button
                 onClick={handleJoinGame}
                 disabled={joinCode.trim().length < 4}
                 className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
                 Join
               </button>
             </div>
