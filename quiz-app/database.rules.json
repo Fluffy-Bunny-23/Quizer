@@ -5,8 +5,8 @@
         // Anyone can read session data
         ".read": true,
         
-        // Only the host can write to session root properties
-        ".write": "auth != null && (!data.exists() || data.child('hostUid').val() == auth.uid)",
+        // Only the non-anonymous host can create or modify session root properties
+        ".write": "auth != null && auth.token.provider != 'anonymous' && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || (data.exists() && data.child('hostUid').val() == auth.uid))",
         
         "players": {
           "$playerId": {
