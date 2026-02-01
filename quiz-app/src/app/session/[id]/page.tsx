@@ -130,7 +130,13 @@ export default function HostSession() {
 
       if (remaining <= 0 && session.settings.mode === 'auto') {
         if (timerRef.current) clearInterval(timerRef.current);
-        doShowAnswer();
+        (async () => {
+          try {
+            await doShowAnswer();
+          } catch (error) {
+            console.error('Failed to auto-show answer', error);
+          }
+        })();
       }
     };
 
