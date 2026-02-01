@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Quiz rules
+    match /quizzes/{quizId} {
+      // Anyone can read quizzes (needed for game sessions)
+      allow read: if true;
+      
+      // Only authenticated non-anonymous users (hosts) can create quizzes
+      allow create: if request.auth != null 
+                    && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.questions.size() <= 100;
+      
+      // Only the owner can update their quiz
+      allow update: if request.auth != null 
+                    && resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.questions.size() <= 100;
+      
+      // Only the owner can delete their quiz
+      allow delete: if request.auth != null 
+                    && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}
