@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -13,29 +13,40 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    setMounted(true);
+    mountedRef.current = true;
     // Check for saved theme preference or system preference
     const savedTheme = localStorage.getItem('theme') as Theme | null;
     if (savedTheme) {
-      setTheme(savedTheme);
+      queueMicrotask(() => {
+        if (mountedRef.current) setTheme(savedTheme);
+      });
     } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      setTheme('light');
+      queueMicrotask(() => {
+        if (mountedRef.current) setTheme('light');
+      });
     }
+    
+    // Set initial dark class
+    document.documentElement.classList.add('dark');
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (mounted) {
+    if (mountedRef.current) {
       localStorage.setItem('theme', theme);
       document.documentElement.classList.toggle('dark', theme === 'dark');
     }
-  }, [theme, mounted]);
+  }, [theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

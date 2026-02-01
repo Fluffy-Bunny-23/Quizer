@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { createSession } from '@/lib/sessions';
 import { Quiz, GameMode } from '@/types';
 import Icon from '@mdi/react';
@@ -35,7 +35,7 @@ function NewSessionContent() {
       if (!quizId || !user) return;
 
       try {
-        const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
+        const quizDoc = await getDoc(doc(getDb(), 'quizzes', quizId));
         if (!quizDoc.exists()) {
           setError('Quiz not found');
           return;

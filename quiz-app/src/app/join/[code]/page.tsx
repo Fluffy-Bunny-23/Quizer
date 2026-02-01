@@ -10,7 +10,7 @@ import Icon from '@mdi/react';
 import { mdiArrowLeft, mdiAccount, mdiEye, mdiPlay } from '@mdi/js';
 
 export default function JoinGame() {
-  const { user, loading, signInAsGuest } = useAuth();
+  const { user, signInAsGuest } = useAuth();
   const router = useRouter();
   const params = useParams();
   const sessionCode = (params.code as string)?.toUpperCase();

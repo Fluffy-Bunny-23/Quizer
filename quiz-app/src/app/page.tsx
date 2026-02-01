@@ -12,7 +12,6 @@ export default function Home() {
   const { user, loading, signInWithGoogle, isHost } = useAuth();
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
-  const [isJoining, setIsJoining] = useState(false);
 
   if (loading) {
     return (

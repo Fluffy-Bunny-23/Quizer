@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { Question } from '@/types';
 import Icon from '@mdi/react';
 import {
@@ -108,7 +108,7 @@ export default function NewQuiz() {
 
     setSaving(true);
     try {
-      await addDoc(collection(db, 'quizzes'), {
+      await addDoc(collection(getDb(), 'quizzes'), {
         ownerUid: user!.uid,
         title: title.trim(),
         description: description.trim(),

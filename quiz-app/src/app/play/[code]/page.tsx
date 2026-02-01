@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import {
   subscribeToSession,
   subscribeToPlayers,
@@ -21,7 +21,7 @@ import {
   mdiTrophy,
   mdiClockOutline,
   mdiAccountGroup,
-  mdiExit,
+  mdiExitToApp,
 } from '@mdi/js';
 
 export default function PlayGame() {
@@ -77,7 +77,7 @@ export default function PlayGame() {
       if (!session?.quizId) return;
 
       try {
-        const quizDoc = await getDoc(doc(db, 'quizzes', session.quizId));
+        const quizDoc = await getDoc(doc(getDb(), 'quizzes', session.quizId));
         if (quizDoc.exists()) {
           setQuiz({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
         }
@@ -91,25 +91,27 @@ export default function PlayGame() {
 
   // Timer for question countdown
   useEffect(() => {
-    if (session?.status === 'question' && session.questionStartTime && quiz) {
-      const currentQuestion = quiz.questions[session.currentQuestionIndex];
-      if (!currentQuestion) return;
-
-      const updateTimer = () => {
-        const elapsed = Date.now() - session.questionStartTime!;
-        const remaining = Math.max(0, currentQuestion.timeLimit * 1000 - elapsed);
-        setTimeLeft(Math.ceil(remaining / 1000));
-      };
-
-      updateTimer();
-      timerRef.current = setInterval(updateTimer, 100);
-
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-    } else {
-      setTimeLeft(null);
+    if (!(session?.status === 'question' && session.questionStartTime && quiz)) {
+      // Not in question state
+      return;
     }
+    
+    const currentQuestion = quiz.questions[session.currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const updateTimer = () => {
+      const elapsed = Date.now() - session.questionStartTime!;
+      const remaining = Math.max(0, currentQuestion.timeLimit * 1000 - elapsed);
+      setTimeLeft(Math.ceil(remaining / 1000));
+    };
+
+    updateTimer();
+    timerRef.current = setInterval(updateTimer, 100);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setTimeLeft(null);
+    };
   }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, quiz]);
 
   const handleSelectAnswer = useCallback(async (index: number) => {
@@ -204,7 +206,7 @@ export default function PlayGame() {
               className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-error/10 hover:border-error transition-colors"
               title="Leave game"
             >
-              <Icon path={mdiExit} size={0.8} />
+              <Icon path={mdiExitToApp} size={0.8} />
             </button>
           </div>
         </div>

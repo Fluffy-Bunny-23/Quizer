@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import {
   subscribeToSession,
   subscribeToPlayers,
@@ -88,7 +88,7 @@ export default function HostSession() {
       if (!session?.quizId) return;
 
       try {
-        const quizDoc = await getDoc(doc(db, 'quizzes', session.quizId));
+        const quizDoc = await getDoc(doc(getDb(), 'quizzes', session.quizId));
         if (quizDoc.exists()) {
           setQuiz({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
         }
@@ -100,40 +100,48 @@ export default function HostSession() {
     loadQuiz();
   }, [session?.quizId]);
 
+  // Handle showing answer - defined before useEffect that uses it
+  const doShowAnswer = useCallback(async () => {
+    if (!quiz || !session) return;
+    
+    const currentQuestion = quiz.questions[session.currentQuestionIndex];
+    await calculateScores(
+      sessionId,
+      session.currentQuestionIndex,
+      currentQuestion.correctIndex,
+      currentQuestion.timeLimit
+    );
+    await showAnswerReveal(sessionId);
+  }, [quiz, session, sessionId]);
+
   // Timer for question countdown
   useEffect(() => {
-    if (session?.status === 'question' && session.questionStartTime && quiz) {
-      const currentQuestion = quiz.questions[session.currentQuestionIndex];
-      if (!currentQuestion) return;
-
-      const updateTimer = () => {
-        const elapsed = Date.now() - session.questionStartTime!;
-        const remaining = Math.max(0, currentQuestion.timeLimit * 1000 - elapsed);
-        setTimeLeft(Math.ceil(remaining / 1000));
-
-        if (remaining <= 0 && session.settings.mode === 'auto') {
-          handleTimeUp();
-        }
-      };
-
-      updateTimer();
-      timerRef.current = setInterval(updateTimer, 100);
-
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-    } else {
-      setTimeLeft(null);
+    if (!(session?.status === 'question' && session.questionStartTime && quiz)) {
+      return;
     }
-  }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, quiz]);
-
-  const handleTimeUp = useCallback(async () => {
-    if (!session || !quiz) return;
-    if (timerRef.current) clearInterval(timerRef.current);
     
-    // Auto mode: automatically proceed
-    await handleShowAnswer();
-  }, [session, quiz]);
+    const currentQuestion = quiz.questions[session.currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const updateTimer = () => {
+      const elapsed = Date.now() - session.questionStartTime!;
+      const remaining = Math.max(0, currentQuestion.timeLimit * 1000 - elapsed);
+      setTimeLeft(Math.ceil(remaining / 1000));
+
+      if (remaining <= 0 && session.settings.mode === 'auto') {
+        if (timerRef.current) clearInterval(timerRef.current);
+        doShowAnswer();
+      }
+    };
+
+    updateTimer();
+    timerRef.current = setInterval(updateTimer, 100);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setTimeLeft(null);
+    };
+  }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, session?.settings?.mode, quiz, doShowAnswer]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(sessionId);
@@ -156,24 +164,11 @@ export default function HostSession() {
   };
 
   const handleShowAnswer = async () => {
-    if (!quiz || !session) return;
-    
-    const currentQuestion = quiz.questions[session.currentQuestionIndex];
-    await calculateScores(
-      sessionId,
-      session.currentQuestionIndex,
-      currentQuestion.correctIndex,
-      currentQuestion.timeLimit
-    );
-    await showAnswerReveal(sessionId);
+    await doShowAnswer();
   };
 
   const handleShowLeaderboard = async () => {
     await showLeaderboard(sessionId);
-  };
-
-  const handleEndGame = async () => {
-    await endGame(sessionId);
   };
 
   const handleCloseSession = async () => {

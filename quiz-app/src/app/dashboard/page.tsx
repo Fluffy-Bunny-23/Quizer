@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { Quiz } from '@/types';
 import Icon from '@mdi/react';
 import {
@@ -34,7 +34,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user || !isHost) return;
 
-    const q = query(collection(db, 'quizzes'), where('ownerUid', '==', user.uid));
+    const q = query(collection(getDb(), 'quizzes'), where('ownerUid', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const quizData: Quiz[] = [];
       snapshot.forEach((doc) => {
@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   const handleDeleteQuiz = async (quizId: string) => {
     try {
-      await deleteDoc(doc(db, 'quizzes', quizId));
+      await deleteDoc(doc(getDb(), 'quizzes', quizId));
       setDeleteConfirm(null);
     } catch (error) {
       console.error('Error deleting quiz:', error);

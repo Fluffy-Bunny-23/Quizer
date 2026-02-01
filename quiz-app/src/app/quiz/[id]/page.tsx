@@ -6,7 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { Question, Quiz } from '@/types';
 import Icon from '@mdi/react';
 import {
@@ -52,7 +52,7 @@ export default function EditQuiz() {
       if (!quizId || !user) return;
 
       try {
-        const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
+        const quizDoc = await getDoc(doc(getDb(), 'quizzes', quizId));
         if (!quizDoc.exists()) {
           setError('Quiz not found');
           return;
@@ -145,7 +145,7 @@ export default function EditQuiz() {
 
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'quizzes', quizId), {
+      await updateDoc(doc(getDb(), 'quizzes', quizId), {
         title: title.trim(),
         description: description.trim(),
         questions: questions.map((q) => ({
