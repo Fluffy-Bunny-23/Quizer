@@ -8,7 +8,7 @@ service cloud.firestore {
       
       // Only authenticated non-anonymous users (hosts) can create quizzes
       allow create: if request.auth != null 
-                    && !request.auth.token.firebase.sign_in_provider == 'anonymous'
+                    && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.ownerUid == request.auth.uid
                     && request.resource.data.questions.size() <= 100;
       

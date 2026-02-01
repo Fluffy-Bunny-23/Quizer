@@ -359,7 +359,7 @@ export default function PlayGame() {
               <div className="text-center animate-bounce-in">
                 {selectedAnswer === currentQuestion.correctIndex ? (
                   <div className="text-success text-2xl font-bold">
-                    ✓ Correct! +{myPlayer?.score || 0} points
+                    ✓ Correct!
                   </div>
                 ) : selectedAnswer !== null ? (
                   <div className="text-error text-2xl font-bold">✗ Wrong answer</div>

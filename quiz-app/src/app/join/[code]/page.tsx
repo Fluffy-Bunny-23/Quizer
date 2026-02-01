@@ -70,20 +70,16 @@ export default function JoinGame() {
       // Sign in anonymously if not already signed in
       let playerId = user?.uid;
       if (!user) {
+        // signInAsGuest returns a Promise that resolves when auth is complete
         await signInAsGuest();
-        // Wait for auth state to update
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // The auth state will update, but we need the uid from the result
+        // For now, generate a temporary ID - the auth listener will update later
+        playerId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      } else {
+        playerId = user.uid;
       }
 
-      // Get the user ID after potential sign in
-      const currentUser = user;
-      if (!currentUser?.uid) {
-        // Auth might still be updating, try to get it
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      // Join the session
-      playerId = user?.uid || `guest_${Date.now()}`;
+      // Join the session with the player ID
       await joinSession(sessionCode, playerId, nickname.trim(), role);
       
       // Navigate to play page
