@@ -135,7 +135,7 @@ export default function HostSession() {
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 100);
+    timerRef.current = setInterval(updateTimer, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
