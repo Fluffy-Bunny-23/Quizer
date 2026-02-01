@@ -106,7 +106,7 @@ export default function PlayGame() {
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 100);
+    timerRef.current = setInterval(updateTimer, 500);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
