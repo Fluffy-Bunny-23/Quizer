@@ -149,10 +149,20 @@ export default function HostSession() {
     };
   }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, session?.settings?.mode, quiz, doShowAnswer]);
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(sessionId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyCode = async () => {
+    if (!navigator?.clipboard?.writeText) {
+      window.alert('Copy to clipboard is not supported in this browser. Please copy the code manually.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(sessionId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy session code to clipboard', error);
+      window.alert('Failed to copy the code to clipboard. Please copy it manually.');
+    }
   };
 
   const handleStartGame = async () => {
