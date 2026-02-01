@@ -71,14 +71,20 @@ export default function JoinGame() {
       let playerId = user?.uid;
       if (!user) {
         // signInAsGuest returns a Promise that resolves when auth is complete
-        await signInAsGuest();
-        // The auth state will update, but we need the uid from the result
-        // For now, generate a temporary ID - the auth listener will update later
-        playerId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const guestUser: any = await signInAsGuest();
+        // Try to derive the UID from the result first, then from the updated auth context
+        playerId =
+          guestUser?.uid ??
+          guestUser?.user?.uid ??
+          playerId ??
+          user?.uid;
       } else {
         playerId = user.uid;
       }
 
+      if (!playerId) {
+        throw new Error('Unable to determine player ID after sign-in.');
+      }
       // Join the session with the player ID
       await joinSession(sessionCode, playerId, nickname.trim(), role);
       
