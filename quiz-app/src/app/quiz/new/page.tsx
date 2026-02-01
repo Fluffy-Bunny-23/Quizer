@@ -87,9 +87,9 @@ export default function NewQuiz() {
         setActiveQuestion(i);
         return false;
       }
-      const filledOptions = q.options.filter((o) => o.trim());
-      if (filledOptions.length < 2) {
-        setError(`Question ${i + 1} needs at least 2 options`);
+      const hasEmptyOption = q.options.some((o) => !o.trim());
+      if (hasEmptyOption) {
+        setError(`Question ${i + 1} must have all 4 options filled`);
         setActiveQuestion(i);
         return false;
       }
