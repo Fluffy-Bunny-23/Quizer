@@ -148,6 +148,7 @@ export default function Home() {
                 onClick={handleJoinGame}
                 disabled={joinCode.trim().length < 4}
                 className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Join
               </button>
             </div>

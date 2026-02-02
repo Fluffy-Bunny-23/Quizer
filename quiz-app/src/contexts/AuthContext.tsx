@@ -57,7 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInAsGuest = async () => {
     if (!auth) throw new Error('Firebase not initialized');
-    await signInAnonymously(auth);
+    const result = await signInAnonymously(auth);
+    return result.user;
   };
 
   const signOut = async () => {

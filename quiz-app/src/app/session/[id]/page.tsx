@@ -149,6 +149,30 @@ export default function HostSession() {
     };
   }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, session?.settings?.mode, quiz, doShowAnswer]);
 
+  // Auto-advance when all players have answered
+  useEffect(() => {
+    if (session?.status !== 'question') return;
+    
+    const playerList = Object.values(players).filter(p => p.role === 'player');
+    if (playerList.length === 0) return;
+    
+    const answeredCount = playerList.filter(p => p.lastAnswer !== null).length;
+    
+    if (answeredCount === playerList.length) {
+      // All players answered, auto-advance after 1 second
+      const timeout = setTimeout(async () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        try {
+          await doShowAnswer();
+        } catch (error) {
+          console.error('Failed to auto-show answer after all answered', error);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [session?.status, players, doShowAnswer]);
+
   const copyCode = async () => {
     if (!navigator?.clipboard?.writeText) {
       window.alert('Copy to clipboard is not supported in this browser. Please copy the code manually.');
