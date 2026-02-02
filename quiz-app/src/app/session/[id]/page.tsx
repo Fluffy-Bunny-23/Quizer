@@ -152,13 +152,14 @@ export default function HostSession() {
   // Auto-advance when all players have answered
   useEffect(() => {
     if (session?.status !== 'question') return;
+    if (session?.settings?.mode === 'manual') return; // Don't auto-advance in manual mode
     
     const playerList = Object.values(players).filter(p => p.role === 'player');
     if (playerList.length === 0) return;
     
     const answeredCount = playerList.filter(p => p.lastAnswer !== null).length;
     
-    if (answeredCount === playerList.length) {
+    if (answeredCount === playerList.length && answeredCount > 0) {
       // All players answered, auto-advance after 1 second
       const timeout = setTimeout(async () => {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -171,7 +172,7 @@ export default function HostSession() {
       
       return () => clearTimeout(timeout);
     }
-  }, [session?.status, players, doShowAnswer]);
+  }, [session?.status, session?.settings?.mode, players, doShowAnswer]);
 
   const copyCode = async () => {
     if (!navigator?.clipboard?.writeText) {
