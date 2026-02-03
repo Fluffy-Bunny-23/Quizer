@@ -1,8 +1,8 @@
 // Quiz Types (Firestore)
 export interface Question {
   question: string;
-  options: [string, string, string, string];
-  correctIndex: number;
+  options: string[];
+  correctIndices: number[];
   timeLimit: number; // seconds
 }
 

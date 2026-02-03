@@ -23,7 +23,7 @@ const DEFAULT_TIME_LIMIT = 20;
 const emptyQuestion: Question = {
   question: '',
   options: ['', '', '', ''],
-  correctIndex: 0,
+  correctIndices: [],
   timeLimit: DEFAULT_TIME_LIMIT,
 };
 
@@ -69,10 +69,45 @@ export default function NewQuiz() {
 
   const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
     const newQuestions = [...questions];
-    const newOptions: [string, string, string, string] = [...newQuestions[questionIndex].options];
+    const newOptions = [...newQuestions[questionIndex].options];
     newOptions[optionIndex] = value;
     newQuestions[questionIndex] = { ...newQuestions[questionIndex], options: newOptions };
     setQuestions(newQuestions);
+  };
+
+  const toggleCorrectAnswer = (questionIndex: number, optionIndex: number) => {
+    const newQuestions = [...questions];
+    const correctIndices = [...newQuestions[questionIndex].correctIndices];
+    const idx = correctIndices.indexOf(optionIndex);
+    if (idx > -1) {
+      correctIndices.splice(idx, 1);
+    } else {
+      correctIndices.push(optionIndex);
+    }
+    newQuestions[questionIndex] = { ...newQuestions[questionIndex], correctIndices };
+    setQuestions(newQuestions);
+  };
+
+  const addOption = (questionIndex: number) => {
+    const newQuestions = [...questions];
+    if (newQuestions[questionIndex].options.length < 4) {
+      newQuestions[questionIndex].options.push('');
+      setQuestions(newQuestions);
+    }
+  };
+
+  const removeOption = (questionIndex: number, optionIndex: number) => {
+    const newQuestions = [...questions];
+    const filledCount = newQuestions[questionIndex].options.filter((o) => o.trim()).length;
+    if (filledCount > 2) {
+      newQuestions[questionIndex].options.splice(optionIndex, 1);
+      // Update correctIndices - remove this index and shift others
+      const correctIndices = newQuestions[questionIndex].correctIndices
+        .filter((i) => i !== optionIndex)
+        .map((i) => (i > optionIndex ? i - 1 : i));
+      newQuestions[questionIndex].correctIndices = correctIndices;
+      setQuestions(newQuestions);
+    }
   };
 
   const validateQuiz = (): boolean => {
@@ -87,16 +122,24 @@ export default function NewQuiz() {
         setActiveQuestion(i);
         return false;
       }
-      const hasEmptyOption = q.options.some((o) => !o.trim());
-      if (hasEmptyOption) {
-        setError(`Question ${i + 1} must have all 4 options filled`);
+      const filledOptions = q.options.filter((o) => o.trim());
+      if (filledOptions.length < 2) {
+        setError(`Question ${i + 1} needs at least 2 options`);
         setActiveQuestion(i);
         return false;
       }
-      if (!q.options[q.correctIndex]?.trim()) {
-        setError(`Question ${i + 1} correct answer is empty`);
+      if (q.correctIndices.length === 0) {
+        setError(`Question ${i + 1} needs at least 1 correct answer`);
         setActiveQuestion(i);
         return false;
+      }
+      // Validate all correct indices are filled
+      for (const idx of q.correctIndices) {
+        if (!q.options[idx]?.trim()) {
+          setError(`Question ${i + 1} correct answer is empty`);
+          setActiveQuestion(i);
+          return false;
+        }
       }
     }
     return true;
@@ -291,27 +334,27 @@ export default function NewQuiz() {
               {/* Answer Options */}
               <div>
                 <label className="block text-sm text-foreground/70 mb-2">
-                  Answer Options (select correct answer)
+                  Answer Options (click checkbox for correct answers)
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
                   {currentQuestion.options.map((option, i) => (
                     <div
                       key={i}
                       className={`relative flex items-center gap-2 p-3 rounded-lg border-2 transition-colors ${
-                        currentQuestion.correctIndex === i
+                        currentQuestion.correctIndices.includes(i)
                           ? 'border-success bg-success/10'
                           : 'border-card-border'
                       }`}
                     >
                       <button
-                        onClick={() => updateQuestion(activeQuestion, 'correctIndex', i)}
+                        onClick={() => toggleCorrectAnswer(activeQuestion, i)}
                         className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          currentQuestion.correctIndex === i
+                          currentQuestion.correctIndices.includes(i)
                             ? 'bg-success border-success text-white'
                             : 'border-foreground/30 hover:border-success'
                         }`}
                       >
-                        {currentQuestion.correctIndex === i && (
+                        {currentQuestion.correctIndices.includes(i) && (
                           <Icon path={mdiCheck} size={0.6} />
                         )}
                       </button>
@@ -319,10 +362,19 @@ export default function NewQuiz() {
                         type="text"
                         value={option}
                         onChange={(e) => updateOption(activeQuestion, i, e.target.value)}
-                        placeholder={`Option ${i + 1}`}
+                        placeholder={`Option ${i + 1} (optional)`}
                         className="flex-1 bg-transparent border-none focus:outline-none"
                         maxLength={200}
                       />
+                      {currentQuestion.options.length > 2 && !option.trim() && (
+                        <button
+                          onClick={() => removeOption(activeQuestion, i)}
+                          className="p-1 rounded hover:bg-error/20 text-foreground/50"
+                          title="Remove option"
+                        >
+                          <Icon path={mdiDelete} size={0.6} />
+                        </button>
+                      )}
                       <span
                         className={`text-xs font-bold w-6 h-6 rounded flex items-center justify-center ${
                           i === 0
@@ -338,6 +390,14 @@ export default function NewQuiz() {
                       </span>
                     </div>
                   ))}
+                  {currentQuestion.options.length < 4 && (
+                    <button
+                      onClick={() => addOption(activeQuestion)}
+                      className="w-full p-3 rounded-lg border-2 border-dashed border-card-border hover:border-primary/50 text-foreground/50 hover:text-primary transition-colors"
+                    >
+                      + Add Option
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

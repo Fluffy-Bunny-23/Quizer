@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { migrateQuizData } from '@/lib/migration';
 import {
   subscribeToSession,
   subscribeToPlayers,
@@ -45,29 +46,46 @@ export default function PlayGame() {
   useEffect(() => {
     if (!sessionCode) return;
 
-    const unsubSession = subscribeToSession(sessionCode, (sessionData) => {
-      if (!sessionData) {
-        setError('Game session ended');
+    const setupSubscriptions = async () => {
+      try {
+        // Ensure Firebase is initialized before setting up subscriptions
+        const { waitForFirebaseInit } = await import('@/lib/firebase');
+        await waitForFirebaseInit();
+
+        const unsubSession = subscribeToSession(sessionCode, (sessionData) => {
+          if (!sessionData) {
+            setError('Game session ended');
+            setLoadingSession(false);
+            return;
+          }
+          
+          // Reset answer state when moving to new question
+          if (sessionData.currentQuestionIndex !== lastQuestionIndex.current) {
+            setSelectedAnswer(null);
+            setAnswerSubmitted(false);
+            lastQuestionIndex.current = sessionData.currentQuestionIndex;
+          }
+
+          setSession(sessionData);
+          setLoadingSession(false);
+        });
+
+        const unsubPlayers = subscribeToPlayers(sessionCode, setPlayers);
+
+        return () => {
+          unsubSession();
+          unsubPlayers();
+        };
+      } catch (err) {
+        console.error('Error setting up subscriptions:', err);
+        setError('Failed to connect to game');
         setLoadingSession(false);
-        return;
       }
-      
-      // Reset answer state when moving to new question
-      if (sessionData.currentQuestionIndex !== lastQuestionIndex.current) {
-        setSelectedAnswer(null);
-        setAnswerSubmitted(false);
-        lastQuestionIndex.current = sessionData.currentQuestionIndex;
-      }
+    };
 
-      setSession(sessionData);
-      setLoadingSession(false);
-    });
-
-    const unsubPlayers = subscribeToPlayers(sessionCode, setPlayers);
-
+    const cleanup = setupSubscriptions().then(c => c);
     return () => {
-      unsubSession();
-      unsubPlayers();
+      cleanup.then(c => c?.());
     };
   }, [sessionCode]);
 
@@ -79,7 +97,8 @@ export default function PlayGame() {
       try {
         const quizDoc = await getDoc(doc(getDb(), 'quizzes', session.quizId));
         if (quizDoc.exists()) {
-          setQuiz({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
+          const migratedQuiz = migrateQuizData({ id: quizDoc.id, ...quizDoc.data() });
+          setQuiz(migratedQuiz);
         }
       } catch (err) {
         console.error('Error loading quiz:', err);
@@ -330,7 +349,7 @@ export default function PlayGame() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQuestion.options.map((option, i) => {
-                  const isCorrect = i === currentQuestion.correctIndex;
+                  const isCorrect = currentQuestion.correctIndices.includes(i);
                   const isSelected = selectedAnswer === i;
 
                   return (
@@ -357,7 +376,7 @@ export default function PlayGame() {
             {/* Result */}
             {!isSpectator && (
               <div className="text-center animate-bounce-in">
-                {selectedAnswer === currentQuestion.correctIndex ? (
+                {currentQuestion.correctIndices.includes(selectedAnswer ?? -1) ? (
                   <div className="text-success text-2xl font-bold">
                     ✓ Correct!
                   </div>

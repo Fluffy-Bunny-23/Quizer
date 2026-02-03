@@ -181,11 +181,10 @@ export async function getQuestionAnswers(
   return snapshot.exists() ? (snapshot.val() as Record<string, Answer>) : {};
 }
 
-// Calculate and update scores after answer reveal
 export async function calculateScores(
   sessionId: string,
   questionIndex: number,
-  correctIndex: number,
+  correctIndices: number[],
   timeLimit: number
 ): Promise<void> {
   const answers = await getQuestionAnswers(sessionId, questionIndex);
@@ -198,7 +197,7 @@ export async function calculateScores(
   const updates: Record<string, unknown> = {};
 
   Object.entries(answers).forEach(([playerId, answer]) => {
-    if (answer.selectedIndex === correctIndex && players[playerId]) {
+    if (correctIndices.includes(answer.selectedIndex) && players[playerId]) {
       // Speed-based scoring: Max 1000 points, decreases with time
       const maxPoints = 1000;
       const timeFraction = Math.min(answer.timeMs / (timeLimit * 1000), 1);

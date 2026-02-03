@@ -71,6 +71,10 @@ function NewSessionContent() {
 
     setCreating(true);
     try {
+      // Ensure Firebase is initialized before creating session
+      const { waitForFirebaseInit } = await import('@/lib/firebase');
+      await waitForFirebaseInit();
+
       const sessionCode = await createSession(user.uid, quiz.id!, mode);
       router.push(`/session/${sessionCode}`);
     } catch (err) {

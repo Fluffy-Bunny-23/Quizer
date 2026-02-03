@@ -27,6 +27,10 @@ export default function JoinGame() {
       if (!sessionCode) return;
       
       try {
+        // Ensure Firebase is initialized before attempting to access RTDB
+        const { waitForFirebaseInit } = await import('@/lib/firebase');
+        await waitForFirebaseInit();
+        
         const session = await getSession(sessionCode);
         if (!session) {
           setError('Game not found. Check the code and try again.');

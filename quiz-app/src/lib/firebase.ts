@@ -23,10 +23,14 @@ let rtdb: Database | null = null;
 
 if (typeof window !== 'undefined' && isConfigured) {
   // Initialize Firebase only on the client side and if configured
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-  auth = getAuth(app);
-  db = getFirestore(app);
-  rtdb = getDatabase(app);
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+    rtdb = getDatabase(app);
+  } catch (error) {
+    console.error('Failed to initialize Firebase:', error);
+  }
 }
 
 // Helper to get Firestore or throw error
@@ -39,6 +43,22 @@ export function getDb(): Firestore {
 export function getRtdb(): Database {
   if (!rtdb) throw new Error('Firebase Realtime Database not initialized');
   return rtdb;
+}
+
+// Helper to check if Firebase is initialized
+export function isFirebaseInitialized(): boolean {
+  return rtdb !== null && auth !== null && db !== null;
+}
+
+// Helper to wait for Firebase initialization (client-side only)
+export async function waitForFirebaseInit(maxWaitMs: number = 5000): Promise<void> {
+  const startTime = Date.now();
+  while (!isFirebaseInitialized()) {
+    if (Date.now() - startTime > maxWaitMs) {
+      throw new Error('Firebase initialization timeout');
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 }
 
 export { auth, db, rtdb };
