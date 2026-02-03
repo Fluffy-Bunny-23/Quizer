@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth as firebaseGetAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getDatabase, Database } from 'firebase/database';
 
@@ -25,12 +25,18 @@ if (typeof window !== 'undefined' && isConfigured) {
   // Initialize Firebase only on the client side and if configured
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    auth = getAuth(app);
+    auth = firebaseGetAuth(app);
     db = getFirestore(app);
     rtdb = getDatabase(app);
   } catch (error) {
     console.error('Failed to initialize Firebase:', error);
   }
+}
+
+// Helper to get Auth or throw error
+export function getAuth(): Auth {
+  if (!auth) throw new Error('Firebase Auth not initialized');
+  return auth;
 }
 
 // Helper to get Firestore or throw error

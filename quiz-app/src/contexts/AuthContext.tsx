@@ -9,7 +9,7 @@ import {
   signInAnonymously,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getAuth, waitForFirebaseInit } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -30,40 +30,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     
-    if (!auth) {
-      // Schedule state update in microtask to avoid synchronous setState warning
-      queueMicrotask(() => {
-        if (mountedRef.current) setLoading(false);
-      });
-      return;
-    }
-    
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    const setupAuth = async () => {
+      try {
+        await waitForFirebaseInit();
+        const auth = getAuth();
+        
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (mountedRef.current) {
+            setUser(user);
+            setLoading(false);
+          }
+        });
 
+        return () => {
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+        if (mountedRef.current) setLoading(false);
+      }
+    };
+
+    const cleanup = setupAuth();
+    
     return () => {
       mountedRef.current = false;
-      unsubscribe();
+      cleanup.then(fn => fn?.());
     };
   }, []);
 
   const signInWithGoogle = async () => {
-    if (!auth) throw new Error('Firebase not initialized');
+    await waitForFirebaseInit();
+    const auth = getAuth();
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   };
 
   const signInAsGuest = async () => {
-    if (!auth) throw new Error('Firebase not initialized');
+    await waitForFirebaseInit();
+    const auth = getAuth();
     const result = await signInAnonymously(auth);
     return result.user;
   };
 
   const signOut = async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    try {
+      const auth = getAuth();
+      await firebaseSignOut(auth);
+    } catch (error) {
+      console.error('Sign out failed:', error);
+    }
   };
 
   // Hosts are authenticated users (Google login), players are anonymous
