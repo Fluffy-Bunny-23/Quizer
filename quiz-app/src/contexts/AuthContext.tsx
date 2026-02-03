@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInAsGuest: () => Promise<void>;
+  signInAsGuest: () => Promise<User>;
   signOut: () => Promise<void>;
   isHost: boolean;
 }

@@ -77,7 +77,7 @@ export default function JoinGame() {
           guestUser?.uid ??
           guestUser?.user?.uid ??
           playerId ??
-          user?.uid;
+          (user && 'uid' in user ? (user as any).uid : undefined);
       } else {
         playerId = user.uid;
       }
