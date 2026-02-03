@@ -58,6 +58,11 @@ export function isFirebaseInitialized(): boolean {
 
 // Helper to wait for Firebase initialization (client-side only)
 export async function waitForFirebaseInit(maxWaitMs: number = 5000): Promise<void> {
+  // Check if Firebase is properly configured
+  if (!isConfigured) {
+    throw new Error('Firebase is not properly configured. Check environment variables.');
+  }
+  
   const startTime = Date.now();
   while (!isFirebaseInitialized()) {
     if (Date.now() - startTime > maxWaitMs) {

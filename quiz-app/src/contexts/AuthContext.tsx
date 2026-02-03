@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     return () => {
       mountedRef.current = false;
-      cleanup.then(fn => fn?.());
+      cleanup.then(fn => fn?.()).catch(() => {});
     };
   }, []);
 
