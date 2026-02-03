@@ -20,6 +20,7 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let rtdb: Database | null = null;
+let initError: Error | null = null;
 
 if (typeof window !== 'undefined' && isConfigured) {
   // Initialize Firebase only on the client side and if configured
@@ -29,7 +30,8 @@ if (typeof window !== 'undefined' && isConfigured) {
     db = getFirestore(app);
     rtdb = getDatabase(app);
   } catch (error) {
-    console.error('Failed to initialize Firebase:', error);
+    initError = error instanceof Error ? error : new Error(String(error));
+    console.error('Failed to initialize Firebase:', initError);
   }
 }
 
@@ -63,10 +65,15 @@ export async function waitForFirebaseInit(maxWaitMs: number = 5000): Promise<voi
     throw new Error('Firebase is not properly configured. Check environment variables.');
   }
   
+  // If there was an initialization error, throw it immediately
+  if (initError) {
+    throw initError;
+  }
+  
   const startTime = Date.now();
   while (!isFirebaseInitialized()) {
     if (Date.now() - startTime > maxWaitMs) {
-      throw new Error('Firebase initialization timeout');
+      throw new Error(`Firebase initialization timeout after ${maxWaitMs}ms. Check console for errors.`);
     }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
