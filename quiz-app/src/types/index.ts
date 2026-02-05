@@ -4,6 +4,7 @@ export interface Question {
   options: string[];
   correctIndices: number[];
   timeLimit: number; // seconds
+  image?: string; // base64 encoded image data
 }
 
 export interface Quiz {

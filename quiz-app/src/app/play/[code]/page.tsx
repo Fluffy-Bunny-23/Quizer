@@ -299,9 +299,18 @@ export default function PlayGame() {
               <div className="text-sm text-foreground/50 mb-2 text-center">
                 Question {session.currentQuestionIndex + 1}
               </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-center">
+              <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">
                 {currentQuestion.question}
               </h2>
+              {currentQuestion.image && (
+                <div className="mt-4 flex justify-center">
+                  <img
+                    src={currentQuestion.image}
+                    alt="Question"
+                    className="max-h-64 object-contain rounded-lg"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Answer Options */}
@@ -343,9 +352,18 @@ export default function PlayGame() {
         {session.status === 'answer_reveal' && currentQuestion && (
           <div className="animate-fade-in">
             <div className="card mb-6">
-              <h2 className="text-2xl font-bold text-center mb-6">
+              <h2 className="text-2xl font-bold text-center mb-4">
                 {currentQuestion.question}
               </h2>
+              {currentQuestion.image && (
+                <div className="mb-6 flex justify-center">
+                  <img
+                    src={currentQuestion.image}
+                    alt="Question"
+                    className="max-h-64 object-contain rounded-lg"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQuestion.options.map((option, i) => {

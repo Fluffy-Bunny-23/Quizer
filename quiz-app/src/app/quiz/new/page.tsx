@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Loading } from '@/components/Loading';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { Question } from '@/types';
@@ -15,7 +15,9 @@ import {
   mdiDelete,
   mdiCheck,
   mdiContentSave,
+  mdiUpload,
 } from '@mdi/js';
+import { ImageUpload } from '@/components/ImageUpload';
 
 const MAX_QUESTIONS = 100;
 const DEFAULT_TIME_LIMIT = 20;
@@ -36,6 +38,59 @@ export default function NewQuiz() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeQuestion, setActiveQuestion] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportQuiz = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedQuiz = JSON.parse(e.target?.result as string);
+
+        // Validate imported data
+        if (!importedQuiz.title || !Array.isArray(importedQuiz.questions)) {
+          setError('Invalid quiz file format');
+          return;
+        }
+
+        // Validate each question
+        for (let i = 0; i < importedQuiz.questions.length; i++) {
+          const q = importedQuiz.questions[i];
+          if (!q.question || !Array.isArray(q.options) || !Array.isArray(q.correctIndices)) {
+            setError(`Invalid question format at question ${i + 1}`);
+            return;
+          }
+        }
+
+        // Set imported data
+        setTitle(importedQuiz.title);
+        setDescription(importedQuiz.description || '');
+        setQuestions(importedQuiz.questions.map((q: any) => ({
+          question: q.question.trim(),
+          options: q.options.map((o: string) => o.trim()),
+          correctIndices: q.correctIndices,
+          timeLimit: q.timeLimit || DEFAULT_TIME_LIMIT,
+        })));
+        setActiveQuestion(0);
+        setError('');
+      } catch (error) {
+        setError('Failed to import quiz. Please check the file format.');
+        console.error('Import error:', error);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     if (!loading && !isHost) {
@@ -195,6 +250,21 @@ export default function NewQuiz() {
           </button>
           <h1 className="text-xl font-bold">Create Quiz</h1>
           <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              onClick={handleImportQuiz}
+              className="btn-secondary flex items-center gap-2 py-2"
+              title="Import quiz from JSON"
+            >
+              <Icon path={mdiUpload} size={0.8} />
+              Import
+            </button>
             <ThemeToggle />
             <button
               onClick={saveQuiz}
@@ -310,6 +380,16 @@ export default function NewQuiz() {
                   className="input resize-none text-lg"
                   rows={3}
                   maxLength={500}
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm text-foreground/70 mb-1">Question Image (Optional)</label>
+                <ImageUpload
+                  value={currentQuestion.image}
+                  onChange={(image) => updateQuestion(activeQuestion, 'image', image)}
+                  maxFileSizeMB={1}
                 />
               </div>
 

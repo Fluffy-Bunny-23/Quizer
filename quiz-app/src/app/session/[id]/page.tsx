@@ -30,6 +30,7 @@ import {
   mdiClose,
   mdiContentCopy,
   mdiCheckBold,
+  mdiDownload,
 } from '@mdi/js';
 
 export default function HostSession() {
@@ -236,6 +237,53 @@ export default function HostSession() {
     router.push('/dashboard');
   };
 
+  const exportAnswers = () => {
+    if (!quiz || !session) return;
+
+    const playerList = Object.entries(players).filter(([, p]) => p.role === 'player');
+    const sortedPlayers = [...playerList].sort(([, a], [, b]) => b.score - a.score);
+
+    const exportData = {
+      version: '1.0',
+      sessionId: sessionId,
+      sessionStatus: session.status,
+      quizTitle: quiz.title,
+      quizDescription: quiz.description,
+      totalQuestions: quiz.questions.length,
+      exportedAt: new Date().toISOString(),
+      questions: quiz.questions.map((q, index) => ({
+        questionNumber: index + 1,
+        question: q.question,
+        options: q.options,
+        correctIndices: q.correctIndices,
+        timeLimit: q.timeLimit,
+      })),
+      leaderboard: sortedPlayers.map(([playerId, player], index) => ({
+        rank: index + 1,
+        name: player.name,
+        score: player.score,
+        lastAnswer: player.lastAnswer,
+        answerTime: player.answerTime,
+      })),
+      playerAnswers: sortedPlayers.map(([playerId, player]) => ({
+        name: player.name,
+        score: player.score,
+        lastAnswer: player.lastAnswer,
+        answerTime: player.answerTime,
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${quiz.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_answers_${sessionId}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading || loadingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -399,7 +447,16 @@ export default function HostSession() {
               <div className="text-sm text-foreground/50 mb-2">
                 Question {session.currentQuestionIndex + 1} of {quiz?.questions.length}
               </div>
-              <h2 className="text-3xl font-bold text-center mb-8">{currentQuestion.question}</h2>
+              <h2 className="text-3xl font-bold text-center mb-4">{currentQuestion.question}</h2>
+              {currentQuestion.image && (
+                <div className="mb-6 flex justify-center">
+                  <img
+                    src={currentQuestion.image}
+                    alt="Question"
+                    className="max-h-64 object-contain rounded-lg"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 {currentQuestion.options.map((option, i) => (
@@ -440,7 +497,16 @@ export default function HostSession() {
               <div className="text-sm text-foreground/50 mb-2">
                 Question {session.currentQuestionIndex + 1} of {quiz?.questions.length}
               </div>
-              <h2 className="text-3xl font-bold text-center mb-8">{currentQuestion.question}</h2>
+              <h2 className="text-3xl font-bold text-center mb-4">{currentQuestion.question}</h2>
+              {currentQuestion.image && (
+                <div className="mb-6 flex justify-center">
+                  <img
+                    src={currentQuestion.image}
+                    alt="Question"
+                    className="max-h-64 object-contain rounded-lg"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 {currentQuestion.options.map((option, i) => (
@@ -562,12 +628,21 @@ export default function HostSession() {
               </div>
             </div>
 
-            <button
-              onClick={handleCloseSession}
-              className="btn-primary text-lg py-4 px-8"
-            >
-              Close Session
-            </button>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={exportAnswers}
+                className="btn-secondary flex items-center gap-2 text-lg py-4 px-8"
+              >
+                <Icon path={mdiDownload} size={1} />
+                Export Answers
+              </button>
+              <button
+                onClick={handleCloseSession}
+                className="btn-primary text-lg py-4 px-8"
+              >
+                Close Session
+              </button>
+            </div>
           </div>
         )}
       </main>

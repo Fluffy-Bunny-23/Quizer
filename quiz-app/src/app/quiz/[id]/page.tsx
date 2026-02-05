@@ -16,7 +16,9 @@ import {
   mdiDelete,
   mdiCheck,
   mdiContentSave,
+  mdiDownload,
 } from '@mdi/js';
+import { ImageUpload } from '@/components/ImageUpload';
 
 const MAX_QUESTIONS = 100;
 const DEFAULT_TIME_LIMIT = 20;
@@ -207,6 +209,31 @@ export default function EditQuiz() {
     }
   };
 
+  const exportQuiz = () => {
+    const quizData = {
+      version: '1.0',
+      title: title.trim(),
+      description: description.trim(),
+      questions: questions.map((q) => ({
+        question: q.question.trim(),
+        options: q.options.map((o) => o.trim()),
+        correctIndices: q.correctIndices,
+        timeLimit: q.timeLimit,
+      })),
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(quizData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase()}_quiz.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading || loadingQuiz || !isHost) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -244,6 +271,14 @@ export default function EditQuiz() {
           </button>
           <h1 className="text-xl font-bold">Edit Quiz</h1>
           <div className="flex items-center gap-2">
+            <button
+              onClick={exportQuiz}
+              className="btn-secondary flex items-center gap-2 py-2"
+              title="Export quiz as JSON"
+            >
+              <Icon path={mdiDownload} size={0.8} />
+              Export
+            </button>
             <ThemeToggle />
             <button
               onClick={saveQuiz}
@@ -359,6 +394,16 @@ export default function EditQuiz() {
                   className="input resize-none text-lg"
                   rows={3}
                   maxLength={500}
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm text-foreground/70 mb-1">Question Image (Optional)</label>
+                <ImageUpload
+                  value={currentQuestion.image}
+                  onChange={(image) => updateQuestion(activeQuestion, 'image', image)}
+                  maxFileSizeMB={1}
                 />
               </div>
 
