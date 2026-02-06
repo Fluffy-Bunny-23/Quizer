@@ -236,6 +236,7 @@ export default function Dashboard() {
               onClick={handleSignOut}
               className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-error/10 hover:border-error transition-colors"
               title="Sign out"
+              aria-label="Sign out"
             >
               <Icon path={mdiLogout} size={1} className="text-foreground" />
             </button>
@@ -265,8 +266,10 @@ export default function Dashboard() {
                   onClick={exportSelectedQuizzes}
                   disabled={selectedQuizzes.size === 0}
                   className="btn-primary flex items-center gap-2 py-2 disabled:opacity-50"
+                  aria-disabled={selectedQuizzes.size === 0}
+                  aria-label={`Export ${selectedQuizzes.size} selected quizzes`}
                 >
-                  <Icon path={mdiDownload} size={0.8} />
+                  <Icon path={mdiDownload} size={0.8} aria-hidden="true" />
                   Export ({selectedQuizzes.size})
                 </button>
                 <button
@@ -276,8 +279,9 @@ export default function Dashboard() {
                   }}
                   className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-error/10 hover:border-error transition-colors"
                   title="Cancel export"
+                  aria-label="Cancel export mode"
                 >
-                  <Icon path={mdiClose} size={1} className="text-foreground" />
+                  <Icon path={mdiClose} size={1} className="text-foreground" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -292,8 +296,9 @@ export default function Dashboard() {
                 onClick={() => setExportMode(true)}
                 className="btn-secondary flex items-center gap-2"
                 title="Export quizzes"
+                aria-label="Export selected quizzes"
               >
-                <Icon path={mdiDownload} size={1} />
+                <Icon path={mdiDownload} size={1} aria-hidden="true" />
                 Export
               </button>
             )}
@@ -301,8 +306,9 @@ export default function Dashboard() {
               onClick={handleImportQuiz}
               className="btn-secondary flex items-center gap-2"
               title="Import quiz from JSON"
+              aria-label="Import quiz from JSON file"
             >
-              <Icon path={mdiUpload} size={1} />
+              <Icon path={mdiUpload} size={1} aria-hidden="true" />
               Import
             </button>
             <input
@@ -315,8 +321,9 @@ export default function Dashboard() {
             <button
               onClick={() => router.push('/quiz/new')}
               className="btn-primary flex items-center gap-2"
+              aria-label="Create new quiz"
             >
-              <Icon path={mdiPlus} size={1} />
+              <Icon path={mdiPlus} size={1} aria-hidden="true" />
               Create Quiz
             </button>
           </div>
@@ -339,22 +346,24 @@ export default function Dashboard() {
               <button
                 onClick={handleImportQuiz}
                 className="btn-secondary inline-flex items-center gap-2"
+                aria-label="Import quiz from JSON file"
               >
-                <Icon path={mdiUpload} size={1} />
+                <Icon path={mdiUpload} size={1} aria-hidden="true" />
                 Import Quiz
               </button>
               <button
                 onClick={() => router.push('/quiz/new')}
                 className="btn-primary inline-flex items-center gap-2"
+                aria-label="Create new quiz"
               >
-                <Icon path={mdiPlus} size={1} />
+                <Icon path={mdiPlus} size={1} aria-hidden="true" />
                 Create Quiz
               </button>
             </div>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {quizzes.map((quiz, index) => (
+              {quizzes.map((quiz, index) => (
               <div
                 key={quiz.id}
                 className={`card animate-slide-in hover:border-primary/50 ${
@@ -364,6 +373,10 @@ export default function Dashboard() {
                 }`}
                 style={{ animationDelay: `${index * 0.05}s` }}
                 onClick={exportMode ? () => toggleQuizSelection(quiz.id!) : undefined}
+                role={exportMode ? 'button' : undefined}
+                tabIndex={exportMode ? 0 : undefined}
+                aria-label={exportMode ? `Select ${quiz.title} for export` : undefined}
+                aria-pressed={exportMode ? selectedQuizzes.has(quiz.id!) : undefined}
               >
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-xl font-bold truncate flex-1">{quiz.title}</h3>
@@ -392,8 +405,9 @@ export default function Dashboard() {
                       }}
                       className="btn-primary flex-1 flex items-center justify-center gap-1 py-2"
                       title="Start game"
+                      aria-label={`Start game: ${quiz.title}`}
                     >
-                      <Icon path={mdiPlay} size={0.8} />
+                      <Icon path={mdiPlay} size={0.8} aria-hidden="true" />
                       Play
                     </button>
                     <button
@@ -403,8 +417,9 @@ export default function Dashboard() {
                       }}
                       className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-primary/10 hover:border-primary transition-colors"
                       title="Edit quiz"
+                      aria-label={`Edit quiz: ${quiz.title}`}
                     >
-                      <Icon path={mdiPencil} size={0.8} />
+                      <Icon path={mdiPencil} size={0.8} aria-hidden="true" />
                     </button>
                     {deleteConfirm === quiz.id ? (
                       <button
@@ -414,8 +429,9 @@ export default function Dashboard() {
                         }}
                         className="p-2 rounded-lg bg-error text-white hover:bg-error/80 transition-colors"
                         title="Confirm delete"
+                        aria-label={`Confirm delete quiz: ${quiz.title}`}
                       >
-                        <Icon path={mdiDelete} size={0.8} />
+                        <Icon path={mdiDelete} size={0.8} aria-hidden="true" />
                       </button>
                     ) : (
                       <button
@@ -425,8 +441,9 @@ export default function Dashboard() {
                         }}
                         className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-error/10 hover:border-error transition-colors"
                         title="Delete quiz"
+                        aria-label={`Delete quiz: ${quiz.title}`}
                       >
-                        <Icon path={mdiDelete} size={0.8} />
+                        <Icon path={mdiDelete} size={0.8} aria-hidden="true" />
                       </button>
                     )}
                   </div>

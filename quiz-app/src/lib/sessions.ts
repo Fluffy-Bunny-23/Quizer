@@ -2,14 +2,26 @@ import { ref, set, get, update, onValue, off, remove } from 'firebase/database';
 import { getRtdb } from './firebase';
 import { Session, Player, GameStatus, GameMode, Answer } from '@/types';
 
-// Generate a random 6-character session code
-export function generateSessionCode(): string {
+// Generate a random 6-character session code with collision detection
+export async function generateSessionCode(): Promise<string> {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluded confusing chars like I, O, 0, 1
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+  const maxRetries = 10;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+
+    // Check if code already exists
+    const existing = await getSession(code);
+    if (!existing) {
+      return code; // Code is unique
+    }
+    // Collision detected, try again
   }
-  return code;
+
+  throw new Error('Failed to generate unique session code after maximum retries');
 }
 
 // Create a new session
@@ -18,7 +30,7 @@ export async function createSession(
   quizId: string,
   mode: GameMode = 'manual'
 ): Promise<string> {
-  const code = generateSessionCode();
+  const code = await generateSessionCode();
   const sessionRef = ref(getRtdb(), `sessions/${code}`);
 
   const session: Session = {

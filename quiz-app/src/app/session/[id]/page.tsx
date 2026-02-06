@@ -296,7 +296,7 @@ export default function HostSession() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="card text-center max-w-md">
-          <p className="text-error mb-4">{error || 'Session not found'}</p>
+          <p className="text-error mb-4" role="alert" aria-live="assertive">{error || 'Session not found'}</p>
           <button onClick={() => router.push('/dashboard')} className="btn-primary">
             Back to Dashboard
           </button>
@@ -323,6 +323,9 @@ export default function HostSession() {
             <div
               className="flex items-center gap-2 bg-card-bg border border-card-border px-4 py-2 rounded-lg cursor-pointer hover:bg-primary/10 transition-colors"
               onClick={copyCode}
+              role="button"
+              tabIndex={0}
+              aria-label={`Copy session code: ${sessionId}`}
             >
               <span className="text-xl font-mono font-bold tracking-widest">{sessionId}</span>
               <Icon
@@ -336,14 +339,14 @@ export default function HostSession() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-4">
+      <main className="max-w-6xl mx-auto p-4" role="main">
         {/* Lobby State */}
         {session.status === 'lobby' && (
           <div className="animate-fade-in">
             <div className="text-center mb-8">
               <h2 className="text-4xl font-bold mb-2">Waiting for Players</h2>
               <p className="text-xl text-foreground/70">
-                Share the code <span className="font-mono font-bold text-primary">{sessionId}</span> to join
+                Share the code <span className="font-mono font-bold text-primary" aria-label={`Session code: ${sessionId}`}>{sessionId}</span> to join
               </p>
             </div>
 
@@ -351,10 +354,10 @@ export default function HostSession() {
               {/* Players */}
               <div className="card">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <Icon path={mdiAccountGroup} size={1} className="text-primary" />
+                  <Icon path={mdiAccountGroup} size={1} className="text-primary" aria-hidden="true" />
                   Players ({playerList.length})
                 </h3>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto" role="list" aria-label="Players in lobby" aria-live="polite">
                   {playerList.length === 0 ? (
                     <p className="text-foreground/50 text-center py-4">Waiting for players...</p>
                   ) : (
@@ -362,9 +365,10 @@ export default function HostSession() {
                       <div
                         key={id}
                         className="flex items-center justify-between p-3 bg-primary/10 rounded-lg animate-slide-in"
+                        role="listitem"
                       >
                         <span className="font-medium">{player.name}</span>
-                        <Icon path={mdiCheck} size={0.8} className="text-success" />
+                        <Icon path={mdiCheck} size={0.8} className="text-success" aria-hidden="true" />
                       </div>
                     ))
                   )}
@@ -374,10 +378,10 @@ export default function HostSession() {
               {/* Spectators */}
               <div className="card">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <Icon path={mdiAccountGroup} size={1} className="text-secondary" />
+                  <Icon path={mdiAccountGroup} size={1} className="text-secondary" aria-hidden="true" />
                   Spectators ({spectatorList.length})
                 </h3>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto" role="list" aria-label="Spectators in lobby">
                   {spectatorList.length === 0 ? (
                     <p className="text-foreground/50 text-center py-4">No spectators</p>
                   ) : (
@@ -385,6 +389,7 @@ export default function HostSession() {
                       <div
                         key={id}
                         className="flex items-center justify-between p-3 bg-secondary/10 rounded-lg"
+                        role="listitem"
                       >
                         <span className="font-medium">{player.name}</span>
                       </div>
@@ -398,16 +403,19 @@ export default function HostSession() {
               <button
                 onClick={handleStartGame}
                 disabled={playerList.length === 0}
+                aria-disabled={playerList.length === 0}
                 className="btn-primary flex items-center gap-2 text-lg py-4 px-8 disabled:opacity-50"
+                aria-label="Start game"
               >
-                <Icon path={mdiPlay} size={1} />
+                <Icon path={mdiPlay} size={1} aria-hidden="true" />
                 Start Game
               </button>
               <button
                 onClick={handleCloseSession}
                 className="btn-secondary flex items-center gap-2"
+                aria-label="Close session"
               >
-                <Icon path={mdiClose} size={1} />
+                <Icon path={mdiClose} size={1} aria-hidden="true" />
                 Cancel
               </button>
             </div>
@@ -419,7 +427,7 @@ export default function HostSession() {
           <div className="animate-fade-in">
             {/* Timer Bar */}
             <div className="mb-6">
-              <div className="h-4 bg-card-border rounded-full overflow-hidden">
+              <div className="h-4 bg-card-border rounded-full overflow-hidden" role="progressbar" aria-label="Time remaining" aria-valuemin={0} aria-valuemax={currentQuestion.timeLimit} aria-valuenow={timeLeft ?? currentQuestion.timeLimit}>
                 <div
                   className={`h-full transition-all duration-100 ease-linear ${
                     timeLeft && timeLeft <= 5
@@ -437,7 +445,7 @@ export default function HostSession() {
                   }}
                 />
               </div>
-              <div className="text-center mt-2 text-2xl font-bold">
+              <div className="text-center mt-2 text-2xl font-bold" aria-live="polite" aria-atomic="true">
                 {timeLeft !== null ? `${timeLeft}s` : '...'}
               </div>
             </div>
@@ -452,7 +460,7 @@ export default function HostSession() {
                 <div className="mb-6 flex justify-center">
                   <img
                     src={currentQuestion.image}
-                    alt="Question"
+                    alt="Question illustration"
                     className="max-h-64 object-contain rounded-lg"
                   />
                 </div>
@@ -469,8 +477,8 @@ export default function HostSession() {
             </div>
 
             {/* Answer Count */}
-            <div className="text-center mb-6">
-              <span className="text-xl">
+            <div className="text-center mb-6" aria-live="polite">
+              <span className="text-xl" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null).length} of ${playerList.length} players answered`}>
                 {Object.values(players).filter((p) => p.lastAnswer !== null).length} / {playerList.length} answered
               </span>
             </div>
@@ -481,8 +489,9 @@ export default function HostSession() {
                 <button
                   onClick={handleShowAnswer}
                   className="btn-accent flex items-center gap-2"
+                  aria-label="End question and show answer"
                 >
-                  <Icon path={mdiStop} size={1} />
+                  <Icon path={mdiStop} size={1} aria-hidden="true" />
                   End Question
                 </button>
               </div>
@@ -502,7 +511,7 @@ export default function HostSession() {
                 <div className="mb-6 flex justify-center">
                   <img
                     src={currentQuestion.image}
-                    alt="Question"
+                    alt="Question illustration"
                     className="max-h-64 object-contain rounded-lg"
                   />
                 </div>
@@ -529,12 +538,12 @@ export default function HostSession() {
             </div>
 
             {/* Stats */}
-            <div className="text-center mb-6">
-              <span className="text-xl text-success">
+            <div className="text-center mb-6" aria-live="polite">
+              <span className="text-xl text-success" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct answers`}>
                 {Object.values(players).filter((p) => p.lastAnswer !== null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct
               </span>
-              <span className="mx-4 text-foreground/50">|</span>
-              <span className="text-xl text-error">
+              <span className="mx-4 text-foreground/50" aria-hidden="true">|</span>
+              <span className="text-xl text-error" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect answers`}>
                 {Object.values(players).filter((p) => p.lastAnswer !== null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect
               </span>
             </div>
@@ -544,15 +553,17 @@ export default function HostSession() {
               <button
                 onClick={handleShowLeaderboard}
                 className="btn-secondary flex items-center gap-2"
+                aria-label="Show leaderboard"
               >
-                <Icon path={mdiTrophy} size={1} />
+                <Icon path={mdiTrophy} size={1} aria-hidden="true" />
                 Show Leaderboard
               </button>
               <button
                 onClick={handleNextQuestion}
                 className="btn-primary flex items-center gap-2"
+                aria-label={isLastQuestion ? 'Finish game' : 'Next question'}
               >
-                <Icon path={mdiSkipNext} size={1} />
+                <Icon path={mdiSkipNext} size={1} aria-hidden="true" />
                 {isLastQuestion ? 'Finish Game' : 'Next Question'}
               </button>
             </div>
@@ -563,17 +574,19 @@ export default function HostSession() {
         {session.status === 'leaderboard' && (
           <div className="animate-fade-in">
             <h2 className="text-4xl font-bold text-center mb-8 flex items-center justify-center gap-2">
-              <Icon path={mdiTrophy} size={1.5} className="text-accent" />
+              <Icon path={mdiTrophy} size={1.5} className="text-accent" aria-hidden="true" />
               Leaderboard
             </h2>
 
             <div className="card max-w-lg mx-auto mb-8">
-              <div className="space-y-3">
+              <div className="space-y-3" role="list" aria-label="Leaderboard rankings">
                 {sortedPlayers.map(([id, player], index) => (
                   <div
                     key={id}
                     className="leaderboard-item animate-slide-in"
                     style={{ animationDelay: `${index * 0.1}s` }}
+                    role="listitem"
+                    aria-label={`Rank ${index + 1}: ${player.name}, ${player.score} points`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl font-bold w-8">{index + 1}</span>
@@ -590,8 +603,9 @@ export default function HostSession() {
               <button
                 onClick={handleNextQuestion}
                 className="btn-primary flex items-center gap-2 text-lg py-4 px-8"
+                aria-label={isLastQuestion ? 'Finish game' : 'Next question'}
               >
-                <Icon path={mdiSkipNext} size={1} />
+                <Icon path={mdiSkipNext} size={1} aria-hidden="true" />
                 {isLastQuestion ? 'Finish Game' : 'Next Question'}
               </button>
             </div>
@@ -601,12 +615,12 @@ export default function HostSession() {
         {/* Finished State */}
         {session.status === 'finished' && (
           <div className="animate-bounce-in text-center">
-            <h2 className="text-5xl font-bold mb-4">🎉 Game Over!</h2>
+            <h2 className="text-5xl font-bold mb-4" role="status" aria-live="polite">🎉 Game Over!</h2>
             
             {sortedPlayers.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-2xl mb-4">Winner</h3>
-                <div className="text-6xl font-bold text-accent mb-2">
+                <div className="text-6xl font-bold text-accent mb-2" aria-label={`Winner: ${sortedPlayers[0][1].name}`}>
                   🏆 {sortedPlayers[0][1].name}
                 </div>
                 <div className="text-3xl text-primary">{sortedPlayers[0][1].score} points</div>
@@ -615,9 +629,9 @@ export default function HostSession() {
 
             <div className="card max-w-lg mx-auto mb-8">
               <h3 className="font-bold text-lg mb-4">Final Standings</h3>
-              <div className="space-y-3">
+              <div className="space-y-3" role="list" aria-label="Final standings">
                 {sortedPlayers.map(([id, player], index) => (
-                  <div key={id} className="leaderboard-item">
+                  <div key={id} className="leaderboard-item" role="listitem" aria-label={`Rank ${index + 1}: ${player.name}, ${player.score} points`}>
                     <div className="flex items-center gap-3">
                       <span className="text-xl font-bold w-8">{index + 1}</span>
                       <span className="font-medium">{player.name}</span>
@@ -632,13 +646,15 @@ export default function HostSession() {
               <button
                 onClick={exportAnswers}
                 className="btn-secondary flex items-center gap-2 text-lg py-4 px-8"
+                aria-label="Export game results"
               >
-                <Icon path={mdiDownload} size={1} />
+                <Icon path={mdiDownload} size={1} aria-hidden="true" />
                 Export Answers
               </button>
               <button
                 onClick={handleCloseSession}
                 className="btn-primary text-lg py-4 px-8"
+                aria-label="Close session and return to dashboard"
               >
                 Close Session
               </button>

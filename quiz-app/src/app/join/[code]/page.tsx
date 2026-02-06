@@ -105,7 +105,7 @@ export default function JoinGame() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="card text-center">
-          <p className="text-error mb-4">Invalid game code</p>
+          <p className="text-error mb-4" role="alert">Invalid game code</p>
           <button onClick={() => router.push('/')} className="btn-primary">
             Go Home
           </button>
@@ -126,7 +126,7 @@ export default function JoinGame() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="card text-center max-w-md">
-          <p className="text-error mb-4">{error}</p>
+          <p className="text-error mb-4" role="alert" aria-live="assertive">{error}</p>
           <button onClick={() => router.push('/')} className="btn-primary">
             Go Home
           </button>
@@ -142,25 +142,26 @@ export default function JoinGame() {
         <button
           onClick={() => router.push('/')}
           className="flex items-center gap-2 text-foreground/70 hover:text-foreground transition-colors"
+          aria-label="Go back to home"
         >
-          <Icon path={mdiArrowLeft} size={1} />
+          <Icon path={mdiArrowLeft} size={1} aria-hidden="true" />
           <span>Back</span>
         </button>
         <h1 className="text-2xl font-bold text-primary">⚡ Quizer</h1>
         <ThemeToggle />
       </header>
 
-      <main className="max-w-md mx-auto p-4 py-8">
+      <main className="max-w-md mx-auto p-4 py-8" role="main">
         <div className="card animate-slide-in">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold mb-2">Join Game</h2>
-            <div className="text-2xl font-mono font-bold text-primary tracking-widest">
+            <div className="text-2xl font-mono font-bold text-primary tracking-widest" aria-label={`Game code: ${sessionCode}`}>
               {sessionCode}
             </div>
           </div>
 
           {error && (
-            <div className="bg-error/10 border border-error text-error px-4 py-3 rounded-lg mb-4">
+            <div className="bg-error/10 border border-error text-error px-4 py-3 rounded-lg mb-4" role="alert" aria-live="assertive">
               {error}
             </div>
           )}
@@ -168,8 +169,9 @@ export default function JoinGame() {
           <div className="space-y-6">
             {/* Nickname */}
             <div>
-              <label className="block text-sm text-foreground/70 mb-2">Your Nickname</label>
+              <label htmlFor="nickname-input" className="block text-sm text-foreground/70 mb-2">Your Nickname</label>
               <input
+                id="nickname-input"
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
@@ -177,11 +179,13 @@ export default function JoinGame() {
                 className="input text-lg text-center"
                 maxLength={20}
                 autoFocus
+                aria-describedby="nickname-help"
               />
+              <span id="nickname-help" className="sr-only">Enter a nickname between 2 and 20 characters</span>
             </div>
 
             {/* Role Selection */}
-            <div>
+            <div role="group" aria-label="Select your role">
               <label className="block text-sm text-foreground/70 mb-2">Join as</label>
               <div className="grid grid-cols-2 gap-4">
                 <button
@@ -191,11 +195,14 @@ export default function JoinGame() {
                       ? 'border-primary bg-primary/10'
                       : 'border-card-border hover:border-primary/50'
                   }`}
+                  aria-pressed={role === 'player'}
+                  aria-label="Join as player - Answer questions"
                 >
                   <Icon
                     path={mdiAccount}
                     size={1.5}
                     className={`mx-auto mb-2 ${role === 'player' ? 'text-primary' : 'text-foreground/50'}`}
+                    aria-hidden="true"
                   />
                   <h4 className="font-bold">Player</h4>
                   <p className="text-xs text-foreground/70">Answer questions</p>
@@ -207,11 +214,14 @@ export default function JoinGame() {
                       ? 'border-secondary bg-secondary/10'
                       : 'border-card-border hover:border-secondary/50'
                   }`}
+                  aria-pressed={role === 'spectator'}
+                  aria-label="Join as spectator - Watch only"
                 >
                   <Icon
                     path={mdiEye}
                     size={1.5}
                     className={`mx-auto mb-2 ${role === 'spectator' ? 'text-secondary' : 'text-foreground/50'}`}
+                    aria-hidden="true"
                   />
                   <h4 className="font-bold">Spectator</h4>
                   <p className="text-xs text-foreground/70">Watch only</p>
@@ -224,8 +234,10 @@ export default function JoinGame() {
               onClick={handleJoin}
               disabled={joining || !nickname.trim()}
               className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4 disabled:opacity-50"
+              aria-disabled={joining || !nickname.trim()}
+              aria-label={joining ? 'Joining game...' : 'Join game'}
             >
-              <Icon path={mdiPlay} size={1} />
+              <Icon path={mdiPlay} size={1} aria-hidden="true" />
               {joining ? 'Joining...' : 'Join Game'}
             </button>
           </div>

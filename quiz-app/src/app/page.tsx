@@ -53,8 +53,9 @@ export default function Home() {
             <button
               onClick={() => router.push('/dashboard')}
               className="btn-primary flex items-center justify-center gap-2"
+              aria-label="Go to dashboard"
             >
-              <Icon path={mdiGamepadVariant} size={1} />
+              <Icon path={mdiGamepadVariant} size={1} aria-hidden="true" />
               Go to Dashboard
             </button>
           </div>
@@ -67,12 +68,12 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="flex justify-between items-center p-4 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-primary animate-pulse-glow">⚡ Quizer</h1>
+        <h1 className="text-3xl font-bold text-primary animate-pulse-glow" aria-label="Quizer">⚡ Quizer</h1>
         <ThemeToggle />
       </header>
 
       {/* Hero Section */}
-      <main className="flex flex-col items-center justify-center px-4 py-12">
+      <main className="flex flex-col items-center justify-center px-4 py-12" role="main">
         <div className="text-center mb-12 animate-slide-in">
           <h2 className="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Live Quiz Games
@@ -83,21 +84,21 @@ export default function Home() {
         </div>
 
         {/* Feature Icons */}
-        <div className="flex gap-8 mb-12 animate-fade-in">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+        <div className="flex gap-8 mb-12 animate-fade-in" role="list" aria-label="Features">
+          <div className="flex flex-col items-center gap-2" role="listitem">
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center" aria-hidden="true">
               <Icon path={mdiGamepadVariant} size={1.5} className="text-primary" />
             </div>
             <span className="text-sm text-foreground/70">Play Live</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2" role="listitem">
+            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center" aria-hidden="true">
               <Icon path={mdiAccountGroup} size={1.5} className="text-secondary" />
             </div>
             <span className="text-sm text-foreground/70">Multiplayer</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2" role="listitem">
+            <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center" aria-hidden="true">
               <Icon path={mdiTrophy} size={1.5} className="text-accent" />
             </div>
             <span className="text-sm text-foreground/70">Leaderboard</span>
@@ -109,7 +110,7 @@ export default function Home() {
           {/* Host Card */}
           <div className="card animate-slide-in" style={{ animationDelay: '0.1s' }}>
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Icon path={mdiGoogle} size={1} className="text-primary" />
+              <Icon path={mdiGoogle} size={1} className="text-primary" aria-hidden="true" />
               Host a Quiz
             </h3>
             <p className="text-foreground/70 mb-6">
@@ -118,8 +119,9 @@ export default function Home() {
             <button
               onClick={handleHostLogin}
               className="btn-primary w-full flex items-center justify-center gap-2"
+              aria-label="Sign in with Google to host quizzes"
             >
-              <Icon path={mdiGoogle} size={1} />
+              <Icon path={mdiGoogle} size={1} aria-hidden="true" />
               Sign in with Google
             </button>
           </div>
@@ -127,7 +129,7 @@ export default function Home() {
           {/* Join Card */}
           <div className="card animate-slide-in" style={{ animationDelay: '0.2s' }}>
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Icon path={mdiAccountGroup} size={1} className="text-secondary" />
+              <Icon path={mdiAccountGroup} size={1} className="text-secondary" aria-hidden="true" />
               Join a Game
             </h3>
             <p className="text-foreground/70 mb-6">
@@ -143,21 +145,25 @@ export default function Home() {
                 className="input flex-1 text-center text-xl font-mono tracking-widest uppercase"
                 onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
                 aria-label="Enter game code"
+                aria-describedby="game-code-help"
               />
               <button
                 onClick={handleJoinGame}
                 disabled={joinCode.trim().length < 4}
                 className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-disabled={joinCode.trim().length < 4}
+                aria-label="Join game"
               >
                 Join
               </button>
             </div>
+            <span id="game-code-help" className="sr-only">Enter a 4 to 8 character game code to join a quiz</span>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="text-center py-8 text-foreground/50 text-sm">
+      <footer className="text-center py-8 text-foreground/50 text-sm" role="contentinfo">
         <p>Built with ⚡ Next.js and Firebase</p>
       </footer>
     </div>

@@ -12,6 +12,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-primary/10 transition-colors duration-200"
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-pressed={theme === 'dark'}
     >
       <Icon
         path={theme === 'dark' ? mdiWeatherSunny : mdiWeatherNight}

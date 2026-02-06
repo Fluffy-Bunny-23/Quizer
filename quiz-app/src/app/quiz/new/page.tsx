@@ -229,7 +229,7 @@ export default function NewQuiz() {
   if (loading || !isHost) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loading />
+        <Loading message="Loading..." />
       </div>
     );
   }
@@ -244,8 +244,9 @@ export default function NewQuiz() {
           <button
             onClick={() => router.push('/dashboard')}
             className="flex items-center gap-2 text-foreground/70 hover:text-foreground transition-colors"
+            aria-label="Back to dashboard"
           >
-            <Icon path={mdiArrowLeft} size={1} />
+            <Icon path={mdiArrowLeft} size={1} aria-hidden="true" />
             <span>Back</span>
           </button>
           <h1 className="text-xl font-bold">Create Quiz</h1>
@@ -261,17 +262,20 @@ export default function NewQuiz() {
               onClick={handleImportQuiz}
               className="btn-secondary flex items-center gap-2 py-2"
               title="Import quiz from JSON"
+              aria-label="Import quiz from JSON file"
             >
-              <Icon path={mdiUpload} size={0.8} />
+              <Icon path={mdiUpload} size={0.8} aria-hidden="true" />
               Import
             </button>
             <ThemeToggle />
             <button
               onClick={saveQuiz}
               disabled={saving}
+              aria-disabled={saving}
               className="btn-primary flex items-center gap-2 py-2"
+              aria-label={saving ? 'Saving quiz...' : 'Save quiz'}
             >
-              <Icon path={mdiContentSave} size={0.8} />
+              <Icon path={mdiContentSave} size={0.8} aria-hidden="true" />
               {saving ? 'Saving...' : 'Save'}
             </button>
           </div>
@@ -280,7 +284,7 @@ export default function NewQuiz() {
 
       <main className="max-w-6xl mx-auto p-4">
         {error && (
-          <div className="bg-error/10 border border-error text-error px-4 py-3 rounded-lg mb-4 animate-slide-in">
+          <div className="bg-error/10 border border-error text-error px-4 py-3 rounded-lg mb-4 animate-slide-in" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
@@ -293,26 +297,33 @@ export default function NewQuiz() {
               <h3 className="font-semibold mb-4">Quiz Details</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-foreground/70 mb-1">Title *</label>
+                  <label htmlFor="quiz-title" className="block text-sm text-foreground/70 mb-1">Title *</label>
                   <input
+                    id="quiz-title"
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Quiz title"
                     className="input"
                     maxLength={100}
+                    aria-describedby="title-help"
+                    required
                   />
+                  <span id="title-help" className="sr-only">Enter a title for your quiz, up to 100 characters</span>
                 </div>
                 <div>
-                  <label className="block text-sm text-foreground/70 mb-1">Description</label>
+                  <label htmlFor="quiz-description" className="block text-sm text-foreground/70 mb-1">Description</label>
                   <textarea
+                    id="quiz-description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Optional description"
                     className="input resize-none"
                     rows={3}
                     maxLength={500}
+                    aria-describedby="description-help"
                   />
+                  <span id="description-help" className="sr-only">Optional description for your quiz, up to 500 characters</span>
                 </div>
               </div>
             </div>
@@ -326,11 +337,12 @@ export default function NewQuiz() {
                   disabled={questions.length >= MAX_QUESTIONS}
                   className="p-1 rounded hover:bg-primary/10 disabled:opacity-50"
                   title="Add question"
+                  aria-label="Add question"
                 >
                   <Icon path={mdiPlus} size={0.8} className="text-primary" />
                 </button>
               </div>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto" role="list" aria-label="Question list">
                 {questions.map((q, i) => (
                   <button
                     key={i}
@@ -340,6 +352,9 @@ export default function NewQuiz() {
                         ? 'bg-primary text-white'
                         : 'bg-card-bg hover:bg-primary/10'
                     }`}
+                    aria-current={activeQuestion === i ? 'true' : undefined}
+                    aria-label={`Question ${i + 1}: ${q.question || 'Untitled'}`}
+                    role="listitem"
                   >
                     <div className="flex justify-between items-center">
                       <span className="font-medium truncate">
@@ -354,8 +369,9 @@ export default function NewQuiz() {
                           className={`p-1 rounded hover:bg-error/20 ${
                             activeQuestion === i ? 'text-white' : 'text-foreground/50'
                           }`}
+                          aria-label={`Delete question ${i + 1}`}
                         >
-                          <Icon path={mdiDelete} size={0.6} />
+                          <Icon path={mdiDelete} size={0.6} aria-hidden="true" />
                         </button>
                       )}
                     </div>
@@ -372,15 +388,19 @@ export default function NewQuiz() {
             <div className="space-y-6">
               {/* Question Text */}
               <div>
-                <label className="block text-sm text-foreground/70 mb-1">Question *</label>
+                <label htmlFor="question-text" className="block text-sm text-foreground/70 mb-1">Question *</label>
                 <textarea
+                  id="question-text"
                   value={currentQuestion.question}
                   onChange={(e) => updateQuestion(activeQuestion, 'question', e.target.value)}
                   placeholder="Enter your question..."
                   className="input resize-none text-lg"
                   rows={3}
                   maxLength={500}
+                  aria-describedby="question-help"
+                  required
                 />
+                <span id="question-help" className="sr-only">Enter your question text, up to 500 characters</span>
               </div>
 
               {/* Image Upload */}
@@ -395,10 +415,11 @@ export default function NewQuiz() {
 
               {/* Time Limit */}
               <div>
-                <label className="block text-sm text-foreground/70 mb-1">
+                <label htmlFor="time-limit" className="block text-sm text-foreground/70 mb-1">
                   Time Limit: {currentQuestion.timeLimit} seconds
                 </label>
                 <input
+                  id="time-limit"
                   type="range"
                   min={5}
                   max={60}
@@ -408,6 +429,10 @@ export default function NewQuiz() {
                     updateQuestion(activeQuestion, 'timeLimit', parseInt(e.target.value))
                   }
                   className="w-full"
+                  aria-valuemin={5}
+                  aria-valuemax={60}
+                  aria-valuenow={currentQuestion.timeLimit}
+                  aria-label={`Time limit: ${currentQuestion.timeLimit} seconds`}
                 />
               </div>
 
@@ -416,7 +441,7 @@ export default function NewQuiz() {
                 <label className="block text-sm text-foreground/70 mb-2">
                   Answer Options (click checkbox for correct answers)
                 </label>
-                <div className="space-y-3">
+                <div className="space-y-3" role="group" aria-label="Answer options">
                   {currentQuestion.options.map((option, i) => (
                     <div
                       key={i}
@@ -433,24 +458,29 @@ export default function NewQuiz() {
                             ? 'bg-success border-success text-white'
                             : 'border-foreground/30 hover:border-success'
                         }`}
+                        aria-pressed={currentQuestion.correctIndices.includes(i)}
+                        aria-label={`Mark option ${String.fromCharCode(65 + i)} as correct answer`}
                       >
                         {currentQuestion.correctIndices.includes(i) && (
-                          <Icon path={mdiCheck} size={0.6} />
+                          <Icon path={mdiCheck} size={0.6} aria-hidden="true" />
                         )}
                       </button>
                       <input
+                        id={`option-${i}`}
                         type="text"
                         value={option}
                         onChange={(e) => updateOption(activeQuestion, i, e.target.value)}
                         placeholder={`Option ${i + 1} (optional)`}
                         className="flex-1 bg-transparent border-none focus:outline-none"
                         maxLength={200}
+                        aria-label={`Answer option ${String.fromCharCode(65 + i)}`}
                       />
                       {currentQuestion.options.length > 2 && !option.trim() && (
                         <button
                           onClick={() => removeOption(activeQuestion, i)}
                           className="p-1 rounded hover:bg-error/20 text-foreground/50"
                           title="Remove option"
+                          aria-label={`Remove option ${i + 1}`}
                         >
                           <Icon path={mdiDelete} size={0.6} />
                         </button>
@@ -474,6 +504,7 @@ export default function NewQuiz() {
                     <button
                       onClick={() => addOption(activeQuestion)}
                       className="w-full p-3 rounded-lg border-2 border-dashed border-card-border hover:border-primary/50 text-foreground/50 hover:text-primary transition-colors"
+                      aria-label="Add answer option"
                     >
                       + Add Option
                     </button>
@@ -487,7 +518,9 @@ export default function NewQuiz() {
               <button
                 onClick={() => setActiveQuestion(Math.max(0, activeQuestion - 1))}
                 disabled={activeQuestion === 0}
+                aria-disabled={activeQuestion === 0}
                 className="btn-secondary py-2 disabled:opacity-50"
+                aria-label="Previous question"
               >
                 Previous
               </button>
@@ -495,12 +528,13 @@ export default function NewQuiz() {
                 <button
                   onClick={() => setActiveQuestion(activeQuestion + 1)}
                   className="btn-primary py-2"
+                  aria-label="Next question"
                 >
                   Next
                 </button>
               ) : (
-                <button onClick={addQuestion} className="btn-accent py-2 flex items-center gap-2">
-                  <Icon path={mdiPlus} size={0.8} />
+                <button onClick={addQuestion} className="btn-accent py-2 flex items-center gap-2" aria-label="Add new question">
+                  <Icon path={mdiPlus} size={0.8} aria-hidden="true" />
                   Add Question
                 </button>
               )}

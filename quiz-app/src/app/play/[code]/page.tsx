@@ -133,6 +133,45 @@ export default function PlayGame() {
     };
   }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, quiz]);
 
+  // Keyboard navigation for answers (keys 1-4)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only work during question state
+      if (session?.status !== 'question') return;
+      
+      // Don't trigger if already submitted
+      if (answerSubmitted) return;
+      
+      // Don't trigger for spectators
+      if (isSpectator) return;
+      
+      // Don't trigger if user is typing in an input field
+      if (event.target instanceof HTMLInputElement || 
+          event.target instanceof HTMLTextAreaElement ||
+          (event.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      
+      // Don't trigger if a modal/dialog is open
+      const openModal = document.querySelector('[role="dialog"], [aria-modal="true"], .modal-open');
+      if (openModal) return;
+      
+      // Map keys 1-4 to answer indices 0-3
+      const keyMap: Record<string, number> = {
+        '1': 0, '2': 1, '3': 2, '4': 3
+      };
+      
+      const answerIndex = keyMap[event.key];
+      if (answerIndex !== undefined && currentQuestion && answerIndex < currentQuestion.options.length) {
+        event.preventDefault();
+        handleSelectAnswer(answerIndex);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [session?.status, answerSubmitted, isSpectator, currentQuestion, handleSelectAnswer]);
+
   const handleSelectAnswer = useCallback(async (index: number) => {
     if (answerSubmitted || !user || !session || !quiz) return;
 
@@ -224,6 +263,7 @@ export default function PlayGame() {
               onClick={handleLeave}
               className="p-2 rounded-lg bg-card-bg border border-card-border hover:bg-error/10 hover:border-error transition-colors"
               title="Leave game"
+              aria-label="Leave game"
             >
               <Icon path={mdiExitToApp} size={0.8} />
             </button>
@@ -289,7 +329,7 @@ export default function PlayGame() {
                   }}
                 />
               </div>
-              <div className="text-center mt-2 text-xl font-bold">
+              <div className="text-center mt-2 text-xl font-bold" aria-live="polite" aria-atomic="true">
                 {timeLeft !== null ? `${timeLeft}s` : '...'}
               </div>
             </div>
@@ -306,7 +346,7 @@ export default function PlayGame() {
                 <div className="mt-4 flex justify-center">
                   <img
                     src={currentQuestion.image}
-                    alt="Question"
+                    alt="Question illustration"
                     className="max-h-64 object-contain rounded-lg"
                   />
                 </div>
@@ -315,21 +355,36 @@ export default function PlayGame() {
 
             {/* Answer Options */}
             {!isSpectator ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <>
+                <div className="text-center text-foreground/50 text-sm mb-2 hidden md:block">
+                  Press 1-4 to select an answer
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQuestion.options.map((option, i) => (
                   <button
                     key={i}
                     onClick={() => handleSelectAnswer(i)}
                     disabled={answerSubmitted}
+                    aria-pressed={selectedAnswer === i}
+                    aria-disabled={answerSubmitted}
+                    aria-label={`Answer ${String.fromCharCode(65 + i)}: ${option}`}
                     className={`answer-btn answer-btn-${i} ${
                       selectedAnswer === i ? 'ring-4 ring-white' : ''
                     } ${answerSubmitted && selectedAnswer !== i ? 'opacity-50' : ''}`}
                   >
-                    <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                    {option}
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center">
+                        <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                        <span>{option}</span>
+                      </div>
+                      <kbd className="hidden md:inline-block px-2 py-1 text-xs bg-white/20 rounded ml-2 font-mono">
+                        {i + 1}
+                      </kbd>
+                    </div>
                   </button>
                 ))}
-              </div>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-foreground/70">
                 <p className="text-xl">Watching as spectator...</p>
@@ -359,7 +414,7 @@ export default function PlayGame() {
                 <div className="mb-6 flex justify-center">
                   <img
                     src={currentQuestion.image}
-                    alt="Question"
+                    alt="Question illustration"
                     className="max-h-64 object-contain rounded-lg"
                   />
                 </div>
