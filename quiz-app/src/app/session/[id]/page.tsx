@@ -19,6 +19,7 @@ import {
   showLeaderboard,
   calculateScores,
   endGame,
+  leaveSession,
   deleteSession,
 } from '@/lib/sessions';
 import { Quiz, Session, Player, Question } from '@/types';
@@ -323,6 +324,24 @@ export default function HostSession() {
     }
   };
 
+  const handleKickPlayer = async (playerId: string, playerName: string) => {
+    try {
+      if (!isOnline) {
+        const success = await retry(() => leaveSession(sessionId, playerId));
+        if (!success) {
+          showToast(`Failed to remove ${playerName}. Please check connection.`, 'error');
+          return;
+        }
+      } else {
+        await leaveSession(sessionId, playerId);
+      }
+      showToast(`${playerName} removed`, 'info');
+    } catch (err) {
+      console.error('Error removing player:', err);
+      showToast(`Failed to remove ${playerName}`, 'error');
+    }
+  };
+
   const handleCloseSession = async () => {
     setIsClosing(true);
     try {
@@ -483,14 +502,17 @@ export default function HostSession() {
                     <p className="text-foreground/50 text-center py-4">Waiting for players...</p>
                   ) : (
                     playerList.map(([id, player]) => (
-                      <div
+                      <button
                         key={id}
-                        className="flex items-center justify-between p-3 bg-primary/10 rounded-lg animate-slide-in"
+                        type="button"
+                        onClick={() => handleKickPlayer(id, player.name)}
+                        className="group flex items-center justify-between w-full p-3 bg-primary/10 rounded-lg animate-slide-in hover:bg-primary/20 transition-colors"
                         role="listitem"
+                        aria-label={`Remove ${player.name} from lobby`}
                       >
-                        <span className="font-medium">{player.name}</span>
+                        <span className="font-medium group-hover:line-through">{player.name}</span>
                         <Icon path={mdiCheck} size={0.8} className="text-success" aria-hidden="true" />
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -507,13 +529,16 @@ export default function HostSession() {
                     <p className="text-foreground/50 text-center py-4">No spectators</p>
                   ) : (
                     spectatorList.map(([id, player]) => (
-                      <div
+                      <button
                         key={id}
-                        className="flex items-center justify-between p-3 bg-secondary/10 rounded-lg"
+                        type="button"
+                        onClick={() => handleKickPlayer(id, player.name)}
+                        className="group flex items-center justify-between w-full p-3 bg-secondary/10 rounded-lg hover:bg-secondary/20 transition-colors"
                         role="listitem"
+                        aria-label={`Remove ${player.name} from lobby`}
                       >
-                        <span className="font-medium">{player.name}</span>
-                      </div>
+                        <span className="font-medium group-hover:line-through">{player.name}</span>
+                      </button>
                     ))
                   )}
                 </div>
