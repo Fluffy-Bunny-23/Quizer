@@ -9,6 +9,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { Question } from '@/types';
 import Icon from '@mdi/react';
+import { sanitizeInput, containsXSSPatterns } from '@/lib/utils';
 import {
   mdiArrowLeft,
   mdiPlus,
@@ -29,19 +30,111 @@ const emptyQuestion: Question = {
   timeLimit: DEFAULT_TIME_LIMIT,
 };
 
+// Validation functions
+const validateTitle = (title: string): string | null => {
+  if (!title.trim()) return 'Title is required';
+  if (title.trim().length < 3) return 'Title must be at least 3 characters';
+  if (title.length > 100) return 'Title must be 100 characters or less';
+  return null;
+};
+
+const validateDescription = (description: string): string | null => {
+  if (description.length > 500) return 'Description must be 500 characters or less';
+  return null;
+};
+
+const validateQuestion = (question: string): string | null => {
+  if (!question.trim()) return 'Question text is required';
+  if (question.trim().length < 5) return 'Question must be at least 5 characters';
+  if (question.length > 500) return 'Question must be 500 characters or less';
+  return null;
+};
+
+const validateOption = (option: string): string | null => {
+  if (!option.trim()) return 'Answer option is required';
+  if (option.length > 200) return 'Option must be 200 characters or less';
+  return null;
+};
+
+const isValidTitle = (title: string): boolean => {
+  return title.trim().length >= 3 && title.length <= 100;
+};
+
+const isValidQuestion = (question: string): boolean => {
+  return question.trim().length >= 5 && question.length <= 500;
+};
+
+const areAllOptionsValid = (options: string[]): boolean => {
+  // Only validate filled options (empty options are allowed)
+  const filledOptions = options.filter(opt => opt.trim().length > 0);
+  // Need at least 2 filled options, and all must be <= 200 chars
+  return filledOptions.length >= 2 && filledOptions.every(opt => opt.length <= 200);
+};
+
+const isQuizValid = (title: string, questions: Question[]): boolean => {
+  if (!isValidTitle(title)) return false;
+  return questions.every(q => 
+    isValidQuestion(q.question) && 
+    areAllOptionsValid(q.options) &&
+    q.correctIndices.length > 0
+  );
+};
+
 export default function NewQuiz() {
   const { user, loading, isHost } = useAuth();
   const router = useRouter();
   const [title, setTitle] = useState('');
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([{ ...emptyQuestion }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeQuestion, setActiveQuestion] = useState(0);
+  const [questionErrors, setQuestionErrors] = useState<{[key: number]: {question: string | null, options: (string | null)[]}}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportQuiz = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTitle(value);
+    setTitleError(validateTitle(value));
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setDescription(value);
+    setDescriptionError(validateDescription(value));
+  };
+
+  const handleQuestionChange = (index: number, value: string) => {
+    updateQuestion(index, 'question', value);
+    setQuestionErrors(prev => ({
+      ...prev,
+      [index]: {
+        ...prev[index],
+        question: validateQuestion(value)
+      }
+    }));
+  };
+
+  const handleOptionChange = (questionIndex: number, optionIndex: number, value: string) => {
+    updateOption(questionIndex, optionIndex, value);
+    setQuestionErrors(prev => {
+      const currentErrors = prev[questionIndex]?.options || ['', '', '', ''];
+      const newOptions = [...currentErrors];
+      newOptions[optionIndex] = validateOption(value);
+      return {
+        ...prev,
+        [questionIndex]: {
+          ...prev[questionIndex],
+          options: newOptions
+        }
+      };
+    });
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,12 +161,28 @@ export default function NewQuiz() {
           }
         }
 
-        // Set imported data
-        setTitle(importedQuiz.title);
-        setDescription(importedQuiz.description || '');
+        // Check for XSS patterns in imported data
+        const suspiciousFields: string[] = [];
+        if (containsXSSPatterns(importedQuiz.title)) suspiciousFields.push('title');
+        if (containsXSSPatterns(importedQuiz.description)) suspiciousFields.push('description');
+        importedQuiz.questions.forEach((q: any, idx: number) => {
+          if (containsXSSPatterns(q.question)) suspiciousFields.push(`question ${idx + 1}`);
+          q.options.forEach((opt: string, optIdx: number) => {
+            if (containsXSSPatterns(opt)) suspiciousFields.push(`question ${idx + 1}, option ${optIdx + 1}`);
+          });
+        });
+
+        if (suspiciousFields.length > 0) {
+          setError(`Import blocked: Suspicious content detected in ${suspiciousFields.join(', ')}`);
+          return;
+        }
+
+        // Set imported data with sanitization
+        setTitle(sanitizeInput(importedQuiz.title, 100));
+        setDescription(sanitizeInput(importedQuiz.description || '', 500));
         setQuestions(importedQuiz.questions.map((q: any) => ({
-          question: q.question.trim(),
-          options: q.options.map((o: string) => o.trim()),
+          question: sanitizeInput(q.question, 500),
+          options: q.options.map((o: string) => sanitizeInput(o, 200)),
           correctIndices: q.correctIndices,
           timeLimit: q.timeLimit || DEFAULT_TIME_LIMIT,
         })));
@@ -201,22 +310,34 @@ export default function NewQuiz() {
   };
 
   const saveQuiz = async () => {
+    console.log('💾 saveQuiz called');
     setError('');
-    if (!validateQuiz()) return;
+    if (!validateQuiz()) {
+      console.log('❌ Quiz validation failed');
+      return;
+    }
 
     setSaving(true);
     try {
+      console.log('📝 Sanitizing quiz data...');
+      // Sanitize all data before saving
+      const sanitizedTitle = sanitizeInput(title, 100);
+      const sanitizedDescription = sanitizeInput(description, 500);
+      const sanitizedQuestions = questions.map((q) => ({
+        ...q,
+        question: sanitizeInput(q.question, 500),
+        options: q.options.map((o) => sanitizeInput(o, 200)),
+      }));
+
+      console.log('🔥 Saving to Firestore...', { title: sanitizedTitle, questions: sanitizedQuestions.length });
       await addDoc(collection(getDb(), 'quizzes'), {
         ownerUid: user!.uid,
-        title: title.trim(),
-        description: description.trim(),
+        title: sanitizedTitle,
+        description: sanitizedDescription,
         createdAt: serverTimestamp(),
-        questions: questions.map((q) => ({
-          ...q,
-          question: q.question.trim(),
-          options: q.options.map((o) => o.trim()),
-        })),
+        questions: sanitizedQuestions,
       });
+      console.log('✅ Quiz saved successfully');
       router.push('/dashboard');
     } catch (err) {
       console.error('Error saving quiz:', err);
@@ -270,8 +391,8 @@ export default function NewQuiz() {
             <ThemeToggle />
             <button
               onClick={saveQuiz}
-              disabled={saving}
-              aria-disabled={saving}
+              disabled={!isQuizValid(title, questions) || saving}
+              aria-disabled={!isQuizValid(title, questions) || saving}
               className="btn-primary flex items-center gap-2 py-2"
               aria-label={saving ? 'Saving quiz...' : 'Save quiz'}
             >
@@ -297,32 +418,46 @@ export default function NewQuiz() {
               <h3 className="font-semibold mb-4">Quiz Details</h3>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="quiz-title" className="block text-sm text-foreground/70 mb-1">Title *</label>
+                  <label htmlFor="quiz-title" className="block text-sm text-foreground/70 mb-1">
+                    Title *
+                    <span className="float-right text-foreground/50">{title.length}/100</span>
+                  </label>
                   <input
                     id="quiz-title"
                     type="text"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={handleTitleChange}
                     placeholder="Quiz title"
-                    className="input"
+                    className={`input ${titleError ? 'border-error focus:border-error' : ''}`}
                     maxLength={100}
-                    aria-describedby="title-help"
+                    aria-describedby="title-help title-error"
+                    aria-invalid={!!titleError}
                     required
                   />
-                  <span id="title-help" className="sr-only">Enter a title for your quiz, up to 100 characters</span>
+                  {titleError && (
+                    <p id="title-error" className="text-error text-sm mt-1" role="alert">{titleError}</p>
+                  )}
+                  <span id="title-help" className="sr-only">Enter a title for your quiz, 3 to 100 characters required</span>
                 </div>
                 <div>
-                  <label htmlFor="quiz-description" className="block text-sm text-foreground/70 mb-1">Description</label>
+                  <label htmlFor="quiz-description" className="block text-sm text-foreground/70 mb-1">
+                    Description
+                    <span className="float-right text-foreground/50">{description.length}/500</span>
+                  </label>
                   <textarea
                     id="quiz-description"
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={handleDescriptionChange}
                     placeholder="Optional description"
-                    className="input resize-none"
+                    className={`input resize-none ${descriptionError ? 'border-error focus:border-error' : ''}`}
                     rows={3}
                     maxLength={500}
-                    aria-describedby="description-help"
+                    aria-describedby="description-help description-error"
+                    aria-invalid={!!descriptionError}
                   />
+                  {descriptionError && (
+                    <p id="description-error" className="text-error text-sm mt-1" role="alert">{descriptionError}</p>
+                  )}
                   <span id="description-help" className="sr-only">Optional description for your quiz, up to 500 characters</span>
                 </div>
               </div>
@@ -388,19 +523,26 @@ export default function NewQuiz() {
             <div className="space-y-6">
               {/* Question Text */}
               <div>
-                <label htmlFor="question-text" className="block text-sm text-foreground/70 mb-1">Question *</label>
+                <label htmlFor="question-text" className="block text-sm text-foreground/70 mb-1">
+                  Question *
+                  <span className="float-right text-foreground/50">{currentQuestion.question.length}/500</span>
+                </label>
                 <textarea
                   id="question-text"
                   value={currentQuestion.question}
-                  onChange={(e) => updateQuestion(activeQuestion, 'question', e.target.value)}
+                  onChange={(e) => handleQuestionChange(activeQuestion, e.target.value)}
                   placeholder="Enter your question..."
-                  className="input resize-none text-lg"
+                  className={`input resize-none text-lg ${questionErrors[activeQuestion]?.question ? 'border-error focus:border-error' : ''}`}
                   rows={3}
                   maxLength={500}
-                  aria-describedby="question-help"
+                  aria-describedby="question-help question-error"
+                  aria-invalid={!!questionErrors[activeQuestion]?.question}
                   required
                 />
-                <span id="question-help" className="sr-only">Enter your question text, up to 500 characters</span>
+                {questionErrors[activeQuestion]?.question && (
+                  <p id="question-error" className="text-error text-sm mt-1" role="alert">{questionErrors[activeQuestion]?.question}</p>
+                )}
+                <span id="question-help" className="sr-only">Enter your question text, 5 to 500 characters required</span>
               </div>
 
               {/* Image Upload */}
@@ -465,16 +607,21 @@ export default function NewQuiz() {
                           <Icon path={mdiCheck} size={0.6} aria-hidden="true" />
                         )}
                       </button>
-                      <input
-                        id={`option-${i}`}
-                        type="text"
-                        value={option}
-                        onChange={(e) => updateOption(activeQuestion, i, e.target.value)}
-                        placeholder={`Option ${i + 1} (optional)`}
-                        className="flex-1 bg-transparent border-none focus:outline-none"
-                        maxLength={200}
-                        aria-label={`Answer option ${String.fromCharCode(65 + i)}`}
-                      />
+                      <div className="flex-1">
+                        <input
+                          id={`option-${i}`}
+                          type="text"
+                          value={option}
+                          onChange={(e) => updateOption(activeQuestion, i, e.target.value)}
+                          placeholder={`Option ${i + 1} (optional)`}
+                          className="w-full bg-transparent border-none focus:outline-none"
+                          maxLength={200}
+                          aria-label={`Answer option ${String.fromCharCode(65 + i)}`}
+                        />
+                        <div className={`text-xs mt-1 ${option.length > 200 ? 'text-error' : 'text-foreground/50'}`}>
+                          {option.length}/200
+                        </div>
+                      </div>
                       {currentQuestion.options.length > 2 && !option.trim() && (
                         <button
                           onClick={() => removeOption(activeQuestion, i)}

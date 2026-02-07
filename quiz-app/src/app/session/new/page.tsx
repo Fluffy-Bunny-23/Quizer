@@ -10,7 +10,7 @@ import { getDb } from '@/lib/firebase';
 import { createSession } from '@/lib/sessions';
 import { Quiz, GameMode } from '@/types';
 import Icon from '@mdi/react';
-import { mdiArrowLeft, mdiPlay, mdiRobot, mdiHandBackRight } from '@mdi/js';
+import { mdiArrowLeft, mdiPlay, mdiRobot, mdiHandBackRight, mdiShuffle } from '@mdi/js';
 
 function NewSessionContent() {
   const { user, loading, isHost } = useAuth();
@@ -23,6 +23,7 @@ function NewSessionContent() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<GameMode>('manual');
+  const [shuffleQuestions, setShuffleQuestions] = useState(false);
 
   useEffect(() => {
     if (!loading && !isHost) {
@@ -75,7 +76,7 @@ function NewSessionContent() {
       const { waitForFirebaseInit } = await import('@/lib/firebase');
       await waitForFirebaseInit();
 
-      const sessionCode = await createSession(user.uid, quiz.id!, mode);
+      const sessionCode = await createSession(user.uid, quiz.id!, mode, shuffleQuestions, quiz.questions.length);
       router.push(`/session/${sessionCode}`);
     } catch (err) {
       console.error('Error creating session:', err);
@@ -169,6 +170,23 @@ function NewSessionContent() {
                 </p>
               </button>
             </div>
+          </div>
+
+          {/* Shuffle Questions Option */}
+          <div className="mb-6">
+            <label className="flex items-center gap-3 p-4 rounded-xl border-2 border-card-border hover:border-primary/50 cursor-pointer transition-all">
+              <input
+                type="checkbox"
+                checked={shuffleQuestions}
+                onChange={(e) => setShuffleQuestions(e.target.checked)}
+                className="w-5 h-5 rounded border-card-border text-primary focus:ring-primary"
+              />
+              <Icon path={mdiShuffle} size={1.2} className="text-primary" />
+              <div>
+                <span className="font-semibold block">Shuffle Question Order</span>
+                <span className="text-sm text-foreground/70">Randomize the order of questions for this session</span>
+              </div>
+            </label>
           </div>
 
           <button

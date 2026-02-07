@@ -3,6 +3,8 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Loading } from '@/components/Loading';
+import { useToast } from '@/components/Toast';
+import { ConnectionStatus, useConnectionStatus } from '@/components/ConnectionStatus';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -13,6 +15,7 @@ import {
   subscribeToPlayers,
   submitAnswer,
   leaveSession,
+  checkPlayerExists,
 } from '@/lib/sessions';
 import { Quiz, Session, Player, Question } from '@/types';
 import Icon from '@mdi/react';
@@ -39,8 +42,49 @@ export default function PlayGame() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [lastSubmitTime, setLastSubmitTime] = useState<number>(0);
+  const [rateLimitCooldown, setRateLimitCooldown] = useState<number>(0);
+  const [reconnected, setReconnected] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastQuestionIndex = useRef<number>(-1);
+  const rateLimitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  const { showToast } = useToast();
+  const { isOnline, retry, retryCount } = useConnectionStatus();
+
+  // Compute myPlayer early for use in effects
+  const myPlayer = user ? players[user.uid] : null;
+
+  // Check for saved session and attempt reconnection
+  useEffect(() => {
+    const attemptReconnection = async () => {
+      if (!sessionCode || !user) return;
+
+      const savedSession = localStorage.getItem('quizer_session');
+      if (savedSession) {
+        try {
+          const { sessionCode: savedCode, playerName: savedName, userId: savedId } = JSON.parse(savedSession);
+          if (savedCode === sessionCode && user.uid === savedId) {
+            // Attempt reconnection
+            const exists = await checkPlayerExists(sessionCode, user.uid);
+            if (exists) {
+              // Player still in game, continue
+              setReconnected(true);
+            } else {
+              // Player was removed, clear storage
+              localStorage.removeItem('quizer_session');
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing saved session:', err);
+          localStorage.removeItem('quizer_session');
+        }
+      }
+    };
+
+    attemptReconnection();
+  }, [sessionCode, user]);
 
   // Subscribe to session
   useEffect(() => {
@@ -55,6 +99,7 @@ export default function PlayGame() {
         const unsubSession = subscribeToSession(sessionCode, (sessionData) => {
           if (!sessionData) {
             setError('Game session ended');
+            localStorage.removeItem('quizer_session');
             setLoadingSession(false);
             return;
           }
@@ -63,6 +108,10 @@ export default function PlayGame() {
           if (sessionData.currentQuestionIndex !== lastQuestionIndex.current) {
             setSelectedAnswer(null);
             setAnswerSubmitted(false);
+            setRateLimitCooldown(0);
+            if (rateLimitTimerRef.current) {
+              clearInterval(rateLimitTimerRef.current);
+            }
             lastQuestionIndex.current = sessionData.currentQuestionIndex;
           }
 
@@ -115,7 +164,8 @@ export default function PlayGame() {
       return;
     }
     
-    const currentQuestion = quiz.questions[session.currentQuestionIndex];
+    const actualQuestionIndex = getActualQuestionIndex(session.currentQuestionIndex);
+    const currentQuestion = quiz.questions[actualQuestionIndex];
     if (!currentQuestion) return;
 
     const updateTimer = () => {
@@ -133,34 +183,196 @@ export default function PlayGame() {
     };
   }, [session?.status, session?.questionStartTime, session?.currentQuestionIndex, quiz]);
 
-  // Keyboard navigation for answers (keys 1-4)
+  // Cleanup rate limit timer on unmount
   useEffect(() => {
+    return () => {
+      if (rateLimitTimerRef.current) {
+        clearInterval(rateLimitTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Game over cleanup - remove session from localStorage when game finishes
+  useEffect(() => {
+    if (session?.status === 'finished') {
+      localStorage.removeItem('quizer_session');
+    }
+  }, [session?.status]);
+
+  // Tab close cleanup - clear localStorage when user closes tab
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.removeItem('quizer_session');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // Show reconnected UI feedback
+  useEffect(() => {
+    if (reconnected) {
+      showToast('Reconnected to game!', 'success');
+    }
+  }, [reconnected, showToast]);
+
+  const handleSelectAnswer = useCallback(async (index: number) => {
+    if (answerSubmitted || !user || !session || !quiz) return;
+
+    const actualQuestionIndex = getActualQuestionIndex(session.currentQuestionIndex);
+    const currentQuestion = quiz.questions[actualQuestionIndex];
+    if (!currentQuestion) return;
+
+    // Check if player (not spectator)
+    const myPlayer = players[user.uid];
+    if (myPlayer?.role === 'spectator') return;
+
+    // Rate limiting check - 2 second minimum delay between submissions
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+    const minDelay = 2000; // 2 seconds
+
+    if (timeSinceLastSubmit < minDelay) {
+      const remainingCooldown = Math.ceil((minDelay - timeSinceLastSubmit) / 1000);
+      setRateLimitCooldown(remainingCooldown);
+      
+      // Clear any existing timer
+      if (rateLimitTimerRef.current) {
+        clearInterval(rateLimitTimerRef.current);
+      }
+      
+      // Start countdown timer
+      rateLimitTimerRef.current = setInterval(() => {
+        setRateLimitCooldown((prev) => {
+          if (prev <= 1) {
+            if (rateLimitTimerRef.current) {
+              clearInterval(rateLimitTimerRef.current);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return;
+    }
+
+    setLastSubmitTime(now);
+    setSelectedAnswer(index);
+    setAnswerSubmitted(true);
+    setIsSubmitting(true);
+
+    const timeMs = session.questionStartTime
+      ? Date.now() - session.questionStartTime
+      : 0;
+
+    const submitOperation = async () => {
+      await submitAnswer(
+        sessionCode,
+        user.uid,
+        session.currentQuestionIndex,
+        index,
+        timeMs
+      );
+    };
+
+    try {
+      if (!isOnline) {
+        const success = await retry(submitOperation);
+        if (!success) {
+          throw new Error('Failed to submit answer after retry');
+        }
+      } else {
+        await submitOperation();
+      }
+      showToast('Answer submitted!', 'success');
+    } catch (err) {
+      console.error('Error submitting answer:', err);
+      setError('Failed to submit answer');
+      showToast('Failed to submit answer', 'error');
+      // Allow retry
+      setAnswerSubmitted(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [answerSubmitted, user, session, quiz, players, sessionCode, lastSubmitTime, isOnline, retry, showToast]);
+
+  // Save session data when player is confirmed in game
+  useEffect(() => {
+    if (user && myPlayer && sessionCode) {
+      const sessionData = {
+        sessionCode,
+        playerName: myPlayer.name,
+        userId: user.uid,
+        joinTimestamp: Date.now(),
+      };
+      localStorage.setItem('quizer_session', JSON.stringify(sessionData));
+    }
+  }, [user, myPlayer, sessionCode]);
+
+  const handleLeave = async () => {
+    if (user) {
+      try {
+        await leaveSession(sessionCode, user.uid);
+        showToast('Left game successfully', 'info');
+      } catch (err) {
+        console.error('Error leaving session:', err);
+        showToast('Failed to leave game properly', 'error');
+      }
+    }
+    localStorage.removeItem('quizer_session');
+    router.push('/');
+  };
+
+  // Helper to get actual question index from shuffled order
+  const getActualQuestionIndex = (displayIndex: number): number => {
+    if (!session?.questionOrder || displayIndex < 0 || displayIndex >= session.questionOrder.length) {
+      return displayIndex;
+    }
+    return session.questionOrder[displayIndex];
+  };
+
+  // Compute derived state for render
+  const isSpectator = myPlayer?.role === 'spectator';
+  const playerList = Object.entries(players).filter(([, p]) => p.role === 'player');
+  const sortedPlayers = [...playerList].sort(([, a], [, b]) => b.score - a.score);
+  const currentQuestionIndex = session ? getActualQuestionIndex(session.currentQuestionIndex) : -1;
+  const currentQuestion: Question | null = (session && quiz) ? (quiz.questions?.[currentQuestionIndex] ?? null) : null;
+  const myRank = user ? sortedPlayers.findIndex(([id]) => id === user.uid) + 1 : 0;
+
+  // Keyboard navigation for answers (keys 1-4)
+  // Must be before conditional returns to maintain hook order
+  useEffect(() => {
+    if (!session) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only work during question state
       if (session?.status !== 'question') return;
-      
+
       // Don't trigger if already submitted
       if (answerSubmitted) return;
-      
+
+      // Don't trigger if rate limited
+      if (rateLimitCooldown > 0) return;
+
       // Don't trigger for spectators
       if (isSpectator) return;
-      
+
       // Don't trigger if user is typing in an input field
-      if (event.target instanceof HTMLInputElement || 
+      if (event.target instanceof HTMLInputElement ||
           event.target instanceof HTMLTextAreaElement ||
           (event.target as HTMLElement)?.isContentEditable) {
         return;
       }
-      
+
       // Don't trigger if a modal/dialog is open
       const openModal = document.querySelector('[role="dialog"], [aria-modal="true"], .modal-open');
       if (openModal) return;
-      
+
       // Map keys 1-4 to answer indices 0-3
       const keyMap: Record<string, number> = {
         '1': 0, '2': 1, '3': 2, '4': 3
       };
-      
+
       const answerIndex = keyMap[event.key];
       if (answerIndex !== undefined && currentQuestion && answerIndex < currentQuestion.options.length) {
         event.preventDefault();
@@ -170,45 +382,7 @@ export default function PlayGame() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [session?.status, answerSubmitted, isSpectator, currentQuestion, handleSelectAnswer]);
-
-  const handleSelectAnswer = useCallback(async (index: number) => {
-    if (answerSubmitted || !user || !session || !quiz) return;
-
-    const currentQuestion = quiz.questions[session.currentQuestionIndex];
-    if (!currentQuestion) return;
-
-    // Check if player (not spectator)
-    const myPlayer = players[user.uid];
-    if (myPlayer?.role === 'spectator') return;
-
-    setSelectedAnswer(index);
-    setAnswerSubmitted(true);
-
-    const timeMs = session.questionStartTime
-      ? Date.now() - session.questionStartTime
-      : 0;
-
-    try {
-      await submitAnswer(
-        sessionCode,
-        user.uid,
-        session.currentQuestionIndex,
-        index,
-        timeMs
-      );
-    } catch (err) {
-      console.error('Error submitting answer:', err);
-      setError('Failed to submit answer');
-    }
-  }, [answerSubmitted, user, session, quiz, players, sessionCode]);
-
-  const handleLeave = async () => {
-    if (user) {
-      await leaveSession(sessionCode, user.uid);
-    }
-    router.push('/');
-  };
+  }, [session, session?.status, answerSubmitted, rateLimitCooldown, isSpectator, currentQuestion, handleSelectAnswer]);
 
   if (loading || loadingSession) {
     return (
@@ -231,15 +405,9 @@ export default function PlayGame() {
     );
   }
 
-  const myPlayer = user ? players[user.uid] : null;
-  const isSpectator = myPlayer?.role === 'spectator';
-  const playerList = Object.entries(players).filter(([, p]) => p.role === 'player');
-  const sortedPlayers = [...playerList].sort(([, a], [, b]) => b.score - a.score);
-  const currentQuestion: Question | null = quiz?.questions?.[session.currentQuestionIndex] ?? null;
-  const myRank = user ? sortedPlayers.findIndex(([id]) => id === user.uid) + 1 : 0;
-
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionStatus retryCount={retryCount} />
       {/* Header */}
       <header className="border-b border-card-border">
         <div className="flex justify-between items-center p-4 max-w-6xl mx-auto">
@@ -353,6 +521,16 @@ export default function PlayGame() {
               )}
             </div>
 
+            {/* Rate Limit Indicator */}
+            {rateLimitCooldown > 0 && (
+              <div className="text-center mb-4 animate-fade-in">
+                <div className="inline-flex items-center gap-2 bg-warning/20 text-warning px-4 py-2 rounded-full">
+                  <Icon path={mdiClockOutline} size={0.8} />
+                  Please wait {rateLimitCooldown}s before submitting again
+                </div>
+              </div>
+            )}
+
             {/* Answer Options */}
             {!isSpectator ? (
               <>
@@ -364,22 +542,29 @@ export default function PlayGame() {
                   <button
                     key={i}
                     onClick={() => handleSelectAnswer(i)}
-                    disabled={answerSubmitted}
+                    disabled={answerSubmitted || rateLimitCooldown > 0 || isSubmitting}
                     aria-pressed={selectedAnswer === i}
-                    aria-disabled={answerSubmitted}
+                    aria-disabled={answerSubmitted || rateLimitCooldown > 0 || isSubmitting}
                     aria-label={`Answer ${String.fromCharCode(65 + i)}: ${option}`}
                     className={`answer-btn answer-btn-${i} ${
                       selectedAnswer === i ? 'ring-4 ring-white' : ''
-                    } ${answerSubmitted && selectedAnswer !== i ? 'opacity-50' : ''}`}
+                    } ${(answerSubmitted || rateLimitCooldown > 0 || isSubmitting) && selectedAnswer !== i ? 'opacity-50' : ''}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center">
                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                         <span>{option}</span>
                       </div>
-                      <kbd className="hidden md:inline-block px-2 py-1 text-xs bg-white/20 rounded ml-2 font-mono">
-                        {i + 1}
-                      </kbd>
+                      <div className="flex items-center gap-2">
+                        {isSubmitting && selectedAnswer === i && (
+                          <span className="inline-flex">
+                            <Icon path={mdiClockOutline} size={0.8} className="animate-spin" />
+                          </span>
+                        )}
+                        <kbd className="hidden md:inline-block px-2 py-1 text-xs bg-white/20 rounded font-mono">
+                          {i + 1}
+                        </kbd>
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -394,9 +579,18 @@ export default function PlayGame() {
             {/* Submitted Indicator */}
             {answerSubmitted && (
               <div className="text-center mt-6 animate-bounce-in">
-                <div className="inline-flex items-center gap-2 bg-success/20 text-success px-4 py-2 rounded-full">
-                  <Icon path={mdiCheck} size={1} />
-                  Answer submitted!
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${isSubmitting ? 'bg-accent/20 text-accent' : 'bg-success/20 text-success'}`}>
+                  {isSubmitting ? (
+                    <>
+                      <Icon path={mdiClockOutline} size={1} className="animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Icon path={mdiCheck} size={1} />
+                      Answer submitted!
+                    </>
+                  )}
                 </div>
               </div>
             )}

@@ -6,8 +6,20 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getSession, joinSession } from '@/lib/sessions';
+import { sanitizeInput } from '@/lib/utils';
 import Icon from '@mdi/react';
 import { mdiArrowLeft, mdiAccount, mdiEye, mdiPlay } from '@mdi/js';
+
+const validatePlayerName = (name: string): string | null => {
+  if (name.length < 1) return 'Name is required';
+  if (name.length > 30) return 'Name must be 30 characters or less';
+  if (!/[\w\s-]+$/.test(name)) return 'Only letters, numbers, spaces, hyphens, and underscores allowed';
+  return null;
+};
+
+const isValidPlayerName = (name: string): boolean => {
+  return name.length >= 1 && name.length <= 30 && /[\w\s-]+$/.test(name);
+};
 
 export default function JoinGame() {
   const { user, signInAsGuest } = useAuth();
@@ -16,10 +28,21 @@ export default function JoinGame() {
   const sessionCode = (params.code as string)?.toUpperCase();
 
   const [nickname, setNickname] = useState('');
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [role, setRole] = useState<'player' | 'spectator'>('player');
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
   const [sessionValid, setSessionValid] = useState<boolean | null>(null);
+
+  const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNickname(value);
+    if (value) {
+      setNicknameError(validatePlayerName(value));
+    } else {
+      setNicknameError(null);
+    }
+  };
 
   // Check if session exists
   useEffect(() => {
@@ -52,18 +75,21 @@ export default function JoinGame() {
   }, [sessionCode]);
 
   const handleJoin = async () => {
-    if (!nickname.trim()) {
+    // Sanitize the nickname
+    const sanitizedNickname = sanitizeInput(nickname, 30);
+
+    if (!sanitizedNickname) {
       setError('Please enter a nickname');
       return;
     }
 
-    if (nickname.trim().length < 2) {
-      setError('Nickname must be at least 2 characters');
+    if (sanitizedNickname.length < 1) {
+      setError('Nickname is required');
       return;
     }
 
-    if (nickname.trim().length > 20) {
-      setError('Nickname must be 20 characters or less');
+    if (sanitizedNickname.length > 30) {
+      setError('Nickname must be 30 characters or less');
       return;
     }
 
@@ -90,7 +116,7 @@ export default function JoinGame() {
         throw new Error('Unable to determine player ID after sign-in.');
       }
       // Join the session with the player ID
-      await joinSession(sessionCode, playerId, nickname.trim(), role);
+      await joinSession(sessionCode, playerId, sanitizedNickname, role);
       
       // Navigate to play page
       router.push(`/play/${sessionCode}`);
@@ -169,19 +195,28 @@ export default function JoinGame() {
           <div className="space-y-6">
             {/* Nickname */}
             <div>
-              <label htmlFor="nickname-input" className="block text-sm text-foreground/70 mb-2">Your Nickname</label>
+              <label htmlFor="nickname-input" className="block text-sm text-foreground/70 mb-2">
+                Your Nickname
+                <span className="float-right text-foreground/50">{nickname.length}/30</span>
+              </label>
               <input
                 id="nickname-input"
                 type="text"
                 value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
+                onChange={handleNicknameChange}
                 placeholder="Enter your name"
-                className="input text-lg text-center"
-                maxLength={20}
+                className={`input text-lg text-center ${nicknameError ? 'border-error focus:border-error' : ''}`}
+                maxLength={30}
                 autoFocus
-                aria-describedby="nickname-help"
+                aria-describedby="nickname-help nickname-error"
+                aria-invalid={!!nicknameError}
               />
-              <span id="nickname-help" className="sr-only">Enter a nickname between 2 and 20 characters</span>
+              {nicknameError && (
+                <p id="nickname-error" className="text-error text-sm mt-1" role="alert">
+                  {nicknameError}
+                </p>
+              )}
+              <span id="nickname-help" className="sr-only">Enter a nickname between 1 and 30 characters using only letters, numbers, spaces, hyphens, and underscores</span>
             </div>
 
             {/* Role Selection */}
@@ -232,9 +267,9 @@ export default function JoinGame() {
             {/* Join Button */}
             <button
               onClick={handleJoin}
-              disabled={joining || !nickname.trim()}
+              disabled={joining || !isValidPlayerName(nickname)}
               className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-4 disabled:opacity-50"
-              aria-disabled={joining || !nickname.trim()}
+              aria-disabled={joining || !isValidPlayerName(nickname)}
               aria-label={joining ? 'Joining game...' : 'Join game'}
             >
               <Icon path={mdiPlay} size={1} aria-hidden="true" />

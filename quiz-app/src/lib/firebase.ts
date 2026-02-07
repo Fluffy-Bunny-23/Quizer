@@ -1,7 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth as firebaseGetAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getDatabase, Database } from 'firebase/database';
+import { getAuth as firebaseGetAuth, Auth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getDatabase, Database, connectDatabaseEmulator } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -29,6 +29,18 @@ if (typeof window !== 'undefined' && isConfigured) {
     auth = firebaseGetAuth(app);
     db = getFirestore(app);
     rtdb = getDatabase(app);
+    
+    // Connect to emulators in development
+    if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+      try {
+        connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+        connectFirestoreEmulator(db, 'localhost', 8080);
+        connectDatabaseEmulator(rtdb, 'localhost', 9000);
+        console.log('🔥 Connected to Firebase emulators');
+      } catch (emulatorError) {
+        console.warn('⚠️ Failed to connect to Firebase emulators:', emulatorError);
+      }
+    }
   } catch (error) {
     initError = error instanceof Error ? error : new Error(String(error));
     console.error('Failed to initialize Firebase:', initError);

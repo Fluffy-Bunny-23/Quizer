@@ -24,6 +24,7 @@ export type PlayerRole = 'player' | 'spectator';
 export interface SessionSettings {
   mode: GameMode;
   showLeaderboard: boolean;
+  shuffleQuestions?: boolean;
 }
 
 export interface Session {
@@ -34,6 +35,7 @@ export interface Session {
   currentQuestionIndex: number;
   questionStartTime: number | null;
   players?: Record<string, Player>;
+  questionOrder?: number[];
 }
 
 export interface Player {

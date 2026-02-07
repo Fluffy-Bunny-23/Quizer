@@ -3,6 +3,9 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Loading } from '@/components/Loading';
+import { useToast } from '@/components/Toast';
+import { ConnectionStatus, useConnectionStatus } from '@/components/ConnectionStatus';
+import { LoadingButton } from '@/components/LoadingButton';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -46,7 +49,18 @@ export default function HostSession() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isNextQuestion, setIsNextQuestion] = useState(false);
+  const [isShowingAnswer, setIsShowingAnswer] = useState(false);
+  const [isShowingLeaderboard, setIsShowingLeaderboard] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [loadingQuiz, setLoadingQuiz] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  const { showToast } = useToast();
+  const { isOnline, retry, retryCount } = useConnectionStatus();
 
   // Check host authorization
   useEffect(() => {
@@ -106,6 +120,7 @@ export default function HostSession() {
     const loadQuiz = async () => {
       if (!session?.quizId) return;
 
+      setLoadingQuiz(true);
       try {
         const quizDoc = await getDoc(doc(getDb(), 'quizzes', session.quizId));
         if (quizDoc.exists()) {
@@ -114,6 +129,8 @@ export default function HostSession() {
         }
       } catch (err) {
         console.error('Error loading quiz:', err);
+      } finally {
+        setLoadingQuiz(false);
       }
     };
 
@@ -124,10 +141,11 @@ export default function HostSession() {
   const doShowAnswer = useCallback(async () => {
     if (!quiz || !session) return;
     
-    const currentQuestion = quiz.questions[session.currentQuestionIndex];
+    const actualIndex = getActualQuestionIndex(session.currentQuestionIndex);
+    const currentQuestion = quiz.questions[actualIndex];
     await calculateScores(
       sessionId,
-      session.currentQuestionIndex,
+      actualIndex,
       currentQuestion.correctIndices,
       currentQuestion.timeLimit
     );
@@ -211,34 +229,118 @@ export default function HostSession() {
   };
 
   const handleStartGame = async () => {
-    await startNextQuestion(sessionId);
+    setIsStarting(true);
+    try {
+      if (!isOnline) {
+        const success = await retry(() => startNextQuestion(sessionId));
+        if (!success) {
+          showToast('Failed to start game. Please check connection.', 'error');
+          return;
+        }
+      } else {
+        await startNextQuestion(sessionId);
+      }
+      showToast('Game started!', 'success');
+    } catch (err) {
+      console.error('Error starting game:', err);
+      showToast('Failed to start game', 'error');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleNextQuestion = async () => {
     if (!quiz || !session) return;
     
-    if (session.currentQuestionIndex >= quiz.questions.length - 1) {
-      await endGame(sessionId);
-    } else {
-      await startNextQuestion(sessionId);
+    setIsNextQuestion(true);
+    try {
+      const operation = async () => {
+        if (session.currentQuestionIndex >= quiz.questions.length - 1) {
+          await endGame(sessionId);
+          showToast('Game finished!', 'success');
+        } else {
+          await startNextQuestion(sessionId);
+          showToast('Next question started!', 'success');
+        }
+      };
+      
+      if (!isOnline) {
+        const success = await retry(operation);
+        if (!success) {
+          showToast('Failed to advance game. Please check connection.', 'error');
+          return;
+        }
+      } else {
+        await operation();
+      }
+    } catch (err) {
+      console.error('Error advancing game:', err);
+      showToast('Failed to advance game', 'error');
+    } finally {
+      setIsNextQuestion(false);
     }
   };
 
   const handleShowAnswer = async () => {
-    await doShowAnswer();
+    setIsShowingAnswer(true);
+    try {
+      if (!isOnline) {
+        const success = await retry(() => doShowAnswer());
+        if (!success) {
+          showToast('Failed to reveal answer. Please check connection.', 'error');
+          return;
+        }
+      } else {
+        await doShowAnswer();
+      }
+      showToast('Answer revealed!', 'success');
+    } catch (err) {
+      console.error('Error showing answer:', err);
+      showToast('Failed to reveal answer', 'error');
+    } finally {
+      setIsShowingAnswer(false);
+    }
   };
 
   const handleShowLeaderboard = async () => {
-    await showLeaderboard(sessionId);
+    setIsShowingLeaderboard(true);
+    try {
+      if (!isOnline) {
+        const success = await retry(() => showLeaderboard(sessionId));
+        if (!success) {
+          showToast('Failed to show leaderboard. Please check connection.', 'error');
+          return;
+        }
+      } else {
+        await showLeaderboard(sessionId);
+      }
+      showToast('Leaderboard displayed!', 'success');
+    } catch (err) {
+      console.error('Error showing leaderboard:', err);
+      showToast('Failed to show leaderboard', 'error');
+    } finally {
+      setIsShowingLeaderboard(false);
+    }
   };
 
   const handleCloseSession = async () => {
-    await deleteSession(sessionId);
-    router.push('/dashboard');
+    setIsClosing(true);
+    try {
+      await deleteSession(sessionId);
+      showToast('Session closed', 'info');
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Error closing session:', err);
+      showToast('Failed to close session', 'error');
+      setIsClosing(false);
+    }
   };
 
-  const exportAnswers = () => {
+  const exportAnswers = async () => {
     if (!quiz || !session) return;
+    
+    setIsExporting(true);
+    try {
 
     const playerList = Object.entries(players).filter(([, p]) => p.role === 'player');
     const sortedPlayers = [...playerList].sort(([, a], [, b]) => b.score - a.score);
@@ -282,9 +384,17 @@ export default function HostSession() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+      showToast('Answers exported successfully!', 'success');
+    } catch (err) {
+      console.error('Error exporting answers:', err);
+      showToast('Failed to export answers', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  if (loading || loadingSession) {
+  if (loading || loadingSession || loadingQuiz) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loading message="Loading session..." />
@@ -307,14 +417,25 @@ export default function HostSession() {
 
   const playerList = Object.entries(players).filter(([, p]) => p.role === 'player');
   const spectatorList = Object.entries(players).filter(([, p]) => p.role === 'spectator');
-  const currentQuestion: Question | null = quiz?.questions?.[session.currentQuestionIndex] ?? null;
-  const isLastQuestion = quiz && session.currentQuestionIndex >= quiz.questions.length - 1;
+  
+  // Helper to get actual question index from shuffled order
+  const getActualQuestionIndex = (displayIndex: number): number => {
+    if (!session.questionOrder || displayIndex < 0 || displayIndex >= session.questionOrder.length) {
+      return displayIndex;
+    }
+    return session.questionOrder[displayIndex];
+  };
+  
+  const currentQuestionIndex = getActualQuestionIndex(session.currentQuestionIndex);
+  const currentQuestion: Question | null = quiz?.questions?.[currentQuestionIndex] ?? null;
+  const isLastQuestion = quiz && session.currentQuestionIndex >= (session.questionOrder?.length ?? quiz.questions.length) - 1;
 
   // Sort players by score for leaderboard
   const sortedPlayers = [...playerList].sort(([, a], [, b]) => b.score - a.score);
 
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionStatus retryCount={retryCount} />
       {/* Header */}
       <header className="border-b border-card-border">
         <div className="flex justify-between items-center p-4 max-w-6xl mx-auto">
@@ -400,24 +521,26 @@ export default function HostSession() {
             </div>
 
             <div className="flex justify-center gap-4">
-              <button
+              <LoadingButton
                 onClick={handleStartGame}
-                disabled={playerList.length === 0}
-                aria-disabled={playerList.length === 0}
-                className="btn-primary flex items-center gap-2 text-lg py-4 px-8 disabled:opacity-50"
+                loading={isStarting}
+                disabled={playerList.length === 0 || isStarting}
+                variant="primary"
+                className="text-lg py-4 px-8"
                 aria-label="Start game"
               >
                 <Icon path={mdiPlay} size={1} aria-hidden="true" />
                 Start Game
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 onClick={handleCloseSession}
-                className="btn-secondary flex items-center gap-2"
+                loading={isClosing}
+                variant="secondary"
                 aria-label="Close session"
               >
                 <Icon path={mdiClose} size={1} aria-hidden="true" />
                 Cancel
-              </button>
+              </LoadingButton>
             </div>
           </div>
         )}
@@ -486,14 +609,15 @@ export default function HostSession() {
             {/* Controls */}
             {session.settings.mode === 'manual' && (
               <div className="flex justify-center">
-                <button
+                <LoadingButton
                   onClick={handleShowAnswer}
-                  className="btn-accent flex items-center gap-2"
+                  loading={isShowingAnswer}
+                  variant="accent"
                   aria-label="End question and show answer"
                 >
                   <Icon path={mdiStop} size={1} aria-hidden="true" />
                   End Question
-                </button>
+                </LoadingButton>
               </div>
             )}
           </div>
@@ -550,22 +674,24 @@ export default function HostSession() {
 
             {/* Controls */}
             <div className="flex justify-center gap-4">
-              <button
+              <LoadingButton
                 onClick={handleShowLeaderboard}
-                className="btn-secondary flex items-center gap-2"
+                loading={isShowingLeaderboard}
+                variant="secondary"
                 aria-label="Show leaderboard"
               >
                 <Icon path={mdiTrophy} size={1} aria-hidden="true" />
                 Show Leaderboard
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 onClick={handleNextQuestion}
-                className="btn-primary flex items-center gap-2"
+                loading={isNextQuestion}
+                variant="primary"
                 aria-label={isLastQuestion ? 'Finish game' : 'Next question'}
               >
                 <Icon path={mdiSkipNext} size={1} aria-hidden="true" />
                 {isLastQuestion ? 'Finish Game' : 'Next Question'}
-              </button>
+              </LoadingButton>
             </div>
           </div>
         )}
@@ -600,14 +726,16 @@ export default function HostSession() {
 
             {/* Controls */}
             <div className="flex justify-center">
-              <button
+              <LoadingButton
                 onClick={handleNextQuestion}
-                className="btn-primary flex items-center gap-2 text-lg py-4 px-8"
+                loading={isNextQuestion}
+                variant="primary"
+                className="text-lg py-4 px-8"
                 aria-label={isLastQuestion ? 'Finish game' : 'Next question'}
               >
                 <Icon path={mdiSkipNext} size={1} aria-hidden="true" />
                 {isLastQuestion ? 'Finish Game' : 'Next Question'}
-              </button>
+              </LoadingButton>
             </div>
           </div>
         )}
@@ -643,21 +771,25 @@ export default function HostSession() {
             </div>
 
             <div className="flex justify-center gap-4">
-              <button
+              <LoadingButton
                 onClick={exportAnswers}
-                className="btn-secondary flex items-center gap-2 text-lg py-4 px-8"
+                loading={isExporting}
+                variant="secondary"
+                className="text-lg py-4 px-8"
                 aria-label="Export game results"
               >
                 <Icon path={mdiDownload} size={1} aria-hidden="true" />
                 Export Answers
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 onClick={handleCloseSession}
-                className="btn-primary text-lg py-4 px-8"
+                loading={isClosing}
+                variant="primary"
+                className="text-lg py-4 px-8"
                 aria-label="Close session and return to dashboard"
               >
                 Close Session
-              </button>
+              </LoadingButton>
             </div>
           </div>
         )}

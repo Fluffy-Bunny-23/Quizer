@@ -1,6 +1,17 @@
 import { ref, set, get, update, onValue, off, remove } from 'firebase/database';
 import { getRtdb } from './firebase';
 import { Session, Player, GameStatus, GameMode, Answer } from '@/types';
+import { sanitizeInput } from './utils';
+
+// Fisher-Yates shuffle algorithm
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
 
 // Generate a random 6-character session code with collision detection
 export async function generateSessionCode(): Promise<string> {
@@ -28,10 +39,17 @@ export async function generateSessionCode(): Promise<string> {
 export async function createSession(
   hostUid: string,
   quizId: string,
-  mode: GameMode = 'manual'
+  mode: GameMode = 'manual',
+  shuffleQuestions: boolean = false,
+  questionCount: number = 0
 ): Promise<string> {
   const code = await generateSessionCode();
   const sessionRef = ref(getRtdb(), `sessions/${code}`);
+
+  // Generate question order (shuffled or sequential)
+  const questionOrder = shuffleQuestions
+    ? shuffleArray(Array.from({ length: questionCount }, (_, i) => i))
+    : Array.from({ length: questionCount }, (_, i) => i);
 
   const session: Session = {
     hostUid,
@@ -40,9 +58,11 @@ export async function createSession(
     settings: {
       mode,
       showLeaderboard: true,
+      shuffleQuestions,
     },
     currentQuestionIndex: -1,
     questionStartTime: null,
+    questionOrder,
   };
 
   await set(sessionRef, session);
@@ -90,14 +110,17 @@ export async function joinSession(
   role: 'player' | 'spectator' = 'player'
 ): Promise<void> {
   const playerRef = ref(getRtdb(), `sessions/${sessionId}/players/${playerId}`);
+  // Sanitize player name to prevent XSS (max 30 chars as per UI constraint)
+  const sanitizedName = sanitizeInput(playerName, 30);
   const player: Player = {
-    name: playerName,
+    name: sanitizedName,
     role,
     score: 0,
     lastAnswer: null,
     answerTime: null,
   };
   await set(playerRef, player);
+  await updateLastActivity(sessionId);
 }
 
 // Update player role
@@ -123,6 +146,7 @@ export async function updateSessionStatus(
 ): Promise<void> {
   const updates: Record<string, unknown> = {
     status,
+    lastActivity: Date.now(),
   };
   
   if (status === 'lobby') {
@@ -146,6 +170,7 @@ export async function startNextQuestion(sessionId: string): Promise<void> {
   await update(sessionRef, {
     currentQuestionIndex: nextIndex,
     questionStartTime: Date.now(),
+    lastActivity: Date.now(),
     status: 'question',
   });
 
@@ -181,6 +206,8 @@ export async function submitAnswer(
     lastAnswer: selectedIndex,
     answerTime: timeMs,
   });
+
+  await updateLastActivity(sessionId);
 }
 
 // Get all answers for a question
@@ -252,4 +279,50 @@ export async function deleteSession(sessionId: string): Promise<void> {
 // Update game mode
 export async function updateGameMode(sessionId: string, mode: GameMode): Promise<void> {
   await update(ref(getRtdb(), `sessions/${sessionId}/settings`), { mode });
+}
+
+// Cleanup old sessions
+export async function cleanupOldSessions(maxAgeHours: number = 24): Promise<void> {
+  const sessionsRef = ref(getRtdb(), 'sessions');
+  const snapshot = await get(sessionsRef);
+
+  if (!snapshot.exists()) return;
+
+  const sessions = snapshot.val();
+  const now = Date.now();
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+
+  const updates: Record<string, null> = {};
+
+  Object.entries(sessions).forEach(([sessionId, session]: [string, any]) => {
+    // Check if session is finished or too old
+    const lastActivity = session.lastActivity || session.questionStartTime || 0;
+    const isFinished = session.status === 'finished';
+    const isOld = now - lastActivity > maxAgeMs;
+
+    if (isFinished || isOld) {
+      updates[sessionId] = null;
+    }
+  });
+
+  if (Object.keys(updates).length > 0) {
+    await update(sessionsRef, updates);
+  }
+}
+
+// Check if a player exists in a session
+export async function checkPlayerExists(
+  sessionId: string,
+  playerId: string
+): Promise<boolean> {
+  const playerRef = ref(getRtdb(), `sessions/${sessionId}/players/${playerId}`);
+  const snapshot = await get(playerRef);
+  return snapshot.exists();
+}
+
+// Update last activity timestamp
+export async function updateLastActivity(sessionId: string): Promise<void> {
+  await update(ref(getRtdb(), `sessions/${sessionId}`), {
+    lastActivity: Date.now(),
+  });
 }

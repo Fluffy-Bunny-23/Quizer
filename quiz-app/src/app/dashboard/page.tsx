@@ -3,11 +3,16 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Loading } from '@/components/Loading';
+import { useToast } from '@/components/Toast';
+import { ConnectionStatus, useConnectionStatus } from '@/components/ConnectionStatus';
+import { LoadingButton } from '@/components/LoadingButton';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { cleanupOldSessions } from '@/lib/sessions';
 import { Quiz } from '@/types';
+import { sanitizeQuizImport } from '@/lib/utils';
 import Icon from '@mdi/react';
 import {
   mdiPlus,
@@ -21,6 +26,7 @@ import {
   mdiCheckboxMarked,
   mdiCheckboxBlankOutline,
   mdiClose,
+  mdiBroom,
 } from '@mdi/js';
 
 export default function Dashboard() {
@@ -29,15 +35,29 @@ export default function Dashboard() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set());
   const [exportMode, setExportMode] = useState(false);
+  
+  const { showToast } = useToast();
+  const { isOnline, retry, retryCount } = useConnectionStatus();
 
   useEffect(() => {
     if (!loading && !isHost) {
       router.push('/');
     }
   }, [loading, isHost, router]);
+
+  // Cleanup old sessions on dashboard load
+  useEffect(() => {
+    if (!loading && isHost) {
+      cleanupOldSessions().catch(console.error);
+    }
+  }, [loading, isHost]);
 
   useEffect(() => {
     if (!user || !isHost) return;
@@ -56,17 +76,41 @@ export default function Dashboard() {
   }, [user, isHost]);
 
   const handleDeleteQuiz = async (quizId: string) => {
+    setIsDeleting(quizId);
     try {
-      await deleteDoc(doc(getDb(), 'quizzes', quizId));
+      const operation = async () => {
+        await deleteDoc(doc(getDb(), 'quizzes', quizId));
+      };
+      
+      if (!isOnline) {
+        const success = await retry(operation);
+        if (!success) {
+          showToast('Failed to delete quiz. Please check connection.', 'error');
+          return;
+        }
+      } else {
+        await operation();
+      }
+      
       setDeleteConfirm(null);
+      showToast('Quiz deleted successfully!', 'success');
     } catch (error) {
       console.error('Error deleting quiz:', error);
+      showToast('Failed to delete quiz', 'error');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/');
+    try {
+      await signOut();
+      showToast('Signed out successfully', 'info');
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      showToast('Failed to sign out', 'error');
+    }
   };
 
   const toggleQuizSelection = (quizId: string) => {
@@ -87,11 +131,14 @@ export default function Dashboard() {
     }
   };
 
-  const exportSelectedQuizzes = () => {
+  const exportSelectedQuizzes = async () => {
     if (selectedQuizzes.size === 0) {
-      alert('Please select at least one quiz to export');
+      showToast('Please select at least one quiz to export', 'error');
       return;
     }
+    
+    setIsExporting(true);
+    try {
 
     const quizzesToExport = quizzes.filter(q => selectedQuizzes.has(q.id!));
     
@@ -125,6 +172,14 @@ export default function Dashboard() {
     // Exit export mode after export
     setExportMode(false);
     setSelectedQuizzes(new Set());
+    
+      showToast(`Exported ${quizzesToExport.length} quiz${quizzesToExport.length > 1 ? 'zes' : ''}!`, 'success');
+    } catch (error) {
+      console.error('Error exporting quizzes:', error);
+      showToast('Failed to export quizzes', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleImportQuiz = () => {
@@ -132,15 +187,18 @@ export default function Dashboard() {
   };
 
   const importSingleQuiz = async (quizData: any, user: any) => {
+    // Sanitize the quiz data before saving
+    const { sanitized } = sanitizeQuizImport(quizData);
+    
     const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
     await addDoc(collection(getDb(), 'quizzes'), {
       ownerUid: user.uid,
-      title: quizData.title,
-      description: quizData.description || '',
+      title: sanitized.title,
+      description: sanitized.description || '',
       createdAt: serverTimestamp(),
-      questions: quizData.questions.map((q: any) => ({
-        question: q.question.trim(),
-        options: q.options.map((o: string) => o.trim()),
+      questions: sanitized.questions.map((q: any) => ({
+        question: q.question,
+        options: q.options,
         correctIndices: q.correctIndices,
         timeLimit: q.timeLimit || 20,
       })),
@@ -165,6 +223,7 @@ export default function Dashboard() {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
+    setIsImporting(true);
     try {
       const text = await file.text();
       const importedData = JSON.parse(text);
@@ -178,7 +237,7 @@ export default function Dashboard() {
         // Single quiz format
         quizzesToImport = [importedData];
       } else {
-        alert('Invalid quiz file format');
+        showToast('Invalid quiz file format', 'error');
         return;
       }
 
@@ -186,9 +245,28 @@ export default function Dashboard() {
       for (let i = 0; i < quizzesToImport.length; i++) {
         const error = validateQuiz(quizzesToImport[i], quizzesToImport.length > 1 ? i : undefined);
         if (error) {
-          alert(error);
+          showToast(error, 'error');
           return;
         }
+      }
+
+      // Validate and sanitize all quizzes for XSS patterns
+      const allErrors: string[] = [];
+      for (let i = 0; i < quizzesToImport.length; i++) {
+        const { errors } = sanitizeQuizImport(quizzesToImport[i]);
+        if (errors.length > 0) {
+          // Prefix errors with quiz number if multiple quizzes
+          if (quizzesToImport.length > 1) {
+            allErrors.push(...errors.map(e => `Quiz ${i + 1}: ${e}`));
+          } else {
+            allErrors.push(...errors);
+          }
+        }
+      }
+
+      if (allErrors.length > 0) {
+        showToast(`Import failed: ${allErrors.join(', ')}`, 'error');
+        return;
       }
 
       // Import all quizzes
@@ -196,15 +274,29 @@ export default function Dashboard() {
         await importSingleQuiz(quiz, user);
       }
 
-      alert(`Successfully imported ${quizzesToImport.length} quiz${quizzesToImport.length > 1 ? 'zes' : ''}!`);
+      showToast(`Successfully imported ${quizzesToImport.length} quiz${quizzesToImport.length > 1 ? 'zes' : ''}!`, 'success');
     } catch (error) {
       console.error('Error importing quiz:', error);
-      alert('Failed to import quiz. Please check the file format.');
+      showToast('Failed to import quiz. Please check the file format.', 'error');
     } finally {
+      setIsImporting(false);
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleCleanupSessions = async () => {
+    setIsCleaning(true);
+    try {
+      await cleanupOldSessions();
+      showToast('Old sessions cleaned up!', 'success');
+    } catch (error) {
+      console.error('Error cleaning up sessions:', error);
+      showToast('Failed to cleanup sessions', 'error');
+    } finally {
+      setIsCleaning(false);
     }
   };
 
@@ -218,6 +310,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionStatus retryCount={retryCount} />
       {/* Header */}
       <header className="border-b border-card-border">
         <div className="flex justify-between items-center p-4 max-w-6xl mx-auto">
@@ -262,16 +355,16 @@ export default function Dashboard() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <LoadingButton
                   onClick={exportSelectedQuizzes}
-                  disabled={selectedQuizzes.size === 0}
-                  className="btn-primary flex items-center gap-2 py-2 disabled:opacity-50"
-                  aria-disabled={selectedQuizzes.size === 0}
+                  loading={isExporting}
+                  disabled={selectedQuizzes.size === 0 || isExporting}
+                  className="py-2"
                   aria-label={`Export ${selectedQuizzes.size} selected quizzes`}
                 >
                   <Icon path={mdiDownload} size={0.8} aria-hidden="true" />
                   Export ({selectedQuizzes.size})
-                </button>
+                </LoadingButton>
                 <button
                   onClick={() => {
                     setExportMode(false);
@@ -302,15 +395,15 @@ export default function Dashboard() {
                 Export
               </button>
             )}
-            <button
+            <LoadingButton
               onClick={handleImportQuiz}
-              className="btn-secondary flex items-center gap-2"
-              title="Import quiz from JSON"
+              loading={isImporting}
+              variant="secondary"
               aria-label="Import quiz from JSON file"
             >
               <Icon path={mdiUpload} size={1} aria-hidden="true" />
               Import
-            </button>
+            </LoadingButton>
             <input
               ref={fileInputRef}
               type="file"
@@ -327,7 +420,17 @@ export default function Dashboard() {
               Create Quiz
             </button>
           </div>
-        </div>
+          <LoadingButton
+            onClick={handleCleanupSessions}
+            loading={isCleaning}
+            variant="secondary"
+            className="text-sm py-2 px-3 mt-2"
+            aria-label="Cleanup old sessions"
+          >
+            <Icon path={mdiBroom} size={0.8} aria-hidden="true" />
+            Cleanup Old Sessions
+          </LoadingButton>
+          </div>
 
         {loadingQuizzes ? (
           <Loading message="Loading quizzes..." />
@@ -422,17 +525,20 @@ export default function Dashboard() {
                       <Icon path={mdiPencil} size={0.8} aria-hidden="true" />
                     </button>
                     {deleteConfirm === quiz.id ? (
-                      <button
+                      <LoadingButton
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteQuiz(quiz.id!);
                         }}
-                        className="p-2 rounded-lg bg-error text-white hover:bg-error/80 transition-colors"
+                        loading={isDeleting === quiz.id}
+                        disabled={isDeleting === quiz.id}
+                        variant="secondary"
+                        className="p-2 rounded-lg bg-error text-white hover:bg-error/80 border-0"
                         title="Confirm delete"
                         aria-label={`Confirm delete quiz: ${quiz.title}`}
                       >
                         <Icon path={mdiDelete} size={0.8} aria-hidden="true" />
-                      </button>
+                      </LoadingButton>
                     ) : (
                       <button
                         onClick={(e) => {
