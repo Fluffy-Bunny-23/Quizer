@@ -68,7 +68,7 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="flex justify-between items-center p-4 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-primary animate-pulse-glow" aria-label="Quizer">⚡ Quizer</h1>
+        <h1 className="text-3xl font-bold text-primary" aria-label="Quizer">⚡ Quizer</h1>
         <ThemeToggle />
       </header>
 
