@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: '/workspaces/Quizer/quiz-app',
+  },
   images: {
     unoptimized: true,
   },
