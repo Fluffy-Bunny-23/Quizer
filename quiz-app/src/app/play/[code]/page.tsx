@@ -98,9 +98,22 @@ export default function PlayGame() {
 
         const unsubSession = subscribeToSession(sessionCode, (sessionData) => {
           if (!sessionData) {
-            setError('Game session ended');
+            console.log('🚪 Session ended or deleted', {
+              sessionCode,
+              userId: user?.uid,
+              isHost: user ? !user.isAnonymous : false,
+              timestamp: new Date().toISOString()
+            });
             localStorage.removeItem('quizer_session');
             setLoadingSession(false);
+            // Redirect based on user type
+            if (user && !user.isAnonymous) {
+              console.log('🏠 Redirecting host to dashboard');
+              router.push('/dashboard');
+            } else {
+              console.log('🏠 Redirecting player to homepage');
+              router.push('/');
+            }
             return;
           }
           
@@ -265,7 +278,17 @@ export default function PlayGame() {
       ? Date.now() - session.questionStartTime
       : 0;
 
+    console.log('🎯 About to submit answer:', { 
+      sessionCode, 
+      userId: user.uid, 
+      questionIndex: session.currentQuestionIndex, 
+      selectedIndex: index, 
+      timeMs,
+      isOnline 
+    });
+
     const submitOperation = async () => {
+      console.log('📤 Executing submitOperation...');
       await submitAnswer(
         sessionCode,
         user.uid,
@@ -273,22 +296,38 @@ export default function PlayGame() {
         index,
         timeMs
       );
+      console.log('✅ submitOperation completed successfully');
     };
 
     try {
       if (!isOnline) {
+        console.log('🔄 Using retry mechanism (offline mode)');
         const success = await retry(submitOperation);
         if (!success) {
           throw new Error('Failed to submit answer after retry');
         }
       } else {
+        console.log('📡 Online mode - submitting directly');
         await submitOperation();
       }
+      console.log('🎉 Answer submitted successfully!');
       showToast('Answer submitted!', 'success');
     } catch (err) {
-      console.error('Error submitting answer:', err);
-      setError('Failed to submit answer');
-      showToast('Failed to submit answer', 'error');
+      // Extract Firebase error details
+      const firebaseError = err as { message?: string; code?: string; toString?: () => string };
+      const errorMessage = firebaseError.message || (err instanceof Error ? err.message : String(err));
+      const errorCode = firebaseError.code;
+      console.error('Error submitting answer:', { 
+        error: err, 
+        errorString: err?.toString?.(),
+        message: errorMessage, 
+        code: errorCode, 
+        user: user?.uid, 
+        session: sessionCode, 
+        questionIndex: session?.currentQuestionIndex 
+      });
+      setError(`Failed to submit answer: ${errorMessage}${errorCode ? ` (${errorCode})` : ''}`);
+      showToast(`Failed to submit: ${errorMessage}`, 'error');
       // Allow retry
       setAnswerSubmitted(false);
     } finally {

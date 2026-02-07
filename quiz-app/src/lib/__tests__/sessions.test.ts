@@ -19,6 +19,12 @@ jest.mock('firebase/database', () => ({
   off: mockOff,
 }));
 
+jest.mock('firebase/auth', () => ({
+  getAuth: jest.fn(() => ({
+    currentUser: { uid: 'player-1', isAnonymous: true },
+  })),
+}));
+
 jest.mock('../firebase', () => ({
   getRtdb: jest.fn(() => ({})),
 }));
@@ -274,10 +280,12 @@ describe('joinSession', () => {
         name: 'Alice',
         role: 'player',
         score: 0,
-        lastAnswer: null,
-        answerTime: null,
       })
     );
+    // lastAnswer and answerTime should not be set initially (null fails validation)
+    const playerData = mockSet.mock.calls[0][1];
+    expect(playerData).not.toHaveProperty('lastAnswer');
+    expect(playerData).not.toHaveProperty('answerTime');
   });
 
   it('should sanitize player name', async () => {
@@ -410,8 +418,8 @@ describe('startNextQuestion', () => {
 
     await startNextQuestion('ABC123');
 
-    // Check that player answers are cleared
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    // Check that player answers are cleared using remove() (2 players x 2 fields = 4 removes)
+    expect(mockRemove).toHaveBeenCalledTimes(4);
   });
 
   it('should do nothing if session does not exist', async () => {

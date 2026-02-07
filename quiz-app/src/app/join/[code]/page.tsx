@@ -6,6 +6,7 @@ import { Loading } from '@/components/Loading';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getSession, joinSession } from '@/lib/sessions';
+import { getAuth, waitForFirebaseInit } from '@/lib/firebase';
 import { sanitizeInput } from '@/lib/utils';
 import Icon from '@mdi/react';
 import { mdiArrowLeft, mdiAccount, mdiEye, mdiPlay } from '@mdi/js';
@@ -97,24 +98,19 @@ export default function JoinGame() {
     setError('');
 
     try {
+      await waitForFirebaseInit();
+      const auth = getAuth();
+
       // Sign in anonymously if not already signed in
-      let playerId = user?.uid;
-      if (!user) {
-        // signInAsGuest returns a Promise that resolves when auth is complete
-        const guestUser: any = await signInAsGuest();
-        // Try to derive the UID from the result first, then from the updated auth context
-        playerId =
-          guestUser?.uid ??
-          guestUser?.user?.uid ??
-          playerId ??
-          (user && 'uid' in user ? (user as any).uid : undefined);
-      } else {
-        playerId = user.uid;
+      if (!auth.currentUser) {
+        await signInAsGuest();
       }
 
+      const playerId = auth.currentUser?.uid;
       if (!playerId) {
         throw new Error('Unable to determine player ID after sign-in.');
       }
+
       // Join the session with the player ID
       await joinSession(sessionCode, playerId, sanitizedNickname, role);
       

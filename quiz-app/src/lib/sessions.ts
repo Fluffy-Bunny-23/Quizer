@@ -1,4 +1,5 @@
 import { ref, set, get, update, onValue, off, remove } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 import { getRtdb } from './firebase';
 import { Session, Player, GameStatus, GameMode, Answer } from '@/types';
 import { sanitizeInput } from './utils';
@@ -112,15 +113,13 @@ export async function joinSession(
   const playerRef = ref(getRtdb(), `sessions/${sessionId}/players/${playerId}`);
   // Sanitize player name to prevent XSS (max 30 chars as per UI constraint)
   const sanitizedName = sanitizeInput(playerName, 30);
-  const player: Player = {
+  // Only include required fields - lastAnswer and answerTime are optional
+  const player = {
     name: sanitizedName,
     role,
     score: 0,
-    lastAnswer: null,
-    answerTime: null,
   };
   await set(playerRef, player);
-  await updateLastActivity(sessionId);
 }
 
 // Update player role
@@ -174,17 +173,19 @@ export async function startNextQuestion(sessionId: string): Promise<void> {
     status: 'question',
   });
 
-  // Clear previous answers for players
+  // Clear previous answers for players by removing the fields (not setting to null)
   const playersRef = ref(getRtdb(), `sessions/${sessionId}/players`);
   const playersSnapshot = await get(playersRef);
   if (playersSnapshot.exists()) {
     const players = playersSnapshot.val() as Record<string, Player>;
-    const updates: Record<string, unknown> = {};
-    Object.keys(players).forEach((playerId) => {
-      updates[`${playerId}/lastAnswer`] = null;
-      updates[`${playerId}/answerTime`] = null;
-    });
-    await update(playersRef, updates);
+    // Use remove() to delete fields instead of setting to null (which fails validation)
+    const removePromises = Object.keys(players).map((playerId) =>
+      Promise.all([
+        remove(ref(getRtdb(), `sessions/${sessionId}/players/${playerId}/lastAnswer`)),
+        remove(ref(getRtdb(), `sessions/${sessionId}/players/${playerId}/answerTime`)),
+      ])
+    );
+    await Promise.all(removePromises);
   }
 }
 
@@ -196,18 +197,82 @@ export async function submitAnswer(
   selectedIndex: number,
   timeMs: number
 ): Promise<void> {
+  const auth = getAuth();
+  console.log('🔥 Entering submitAnswer function');
+  console.log('🔥 Parameters:', { 
+    sessionId, 
+    playerId, 
+    questionIndex, 
+    selectedIndex, 
+    timeMs,
+    authUid: auth.currentUser?.uid,
+    isAuthenticated: !!auth.currentUser,
+    isAnonymous: auth.currentUser?.isAnonymous
+  });
+  
+  if (!auth.currentUser) {
+    console.error('❌ Auth check failed: No current user');
+    throw new Error('User not authenticated');
+  }
+  
+  if (auth.currentUser.uid !== playerId) {
+    console.error('❌ Auth check failed: UID mismatch');
+    throw new Error(`Player ID mismatch: auth.uid=${auth.currentUser.uid}, playerId=${playerId}`);
+  }
+  
+  console.log('🔥 Auth checks passed, preparing to write answer...');
+  
   // Record the answer
   const answerRef = ref(getRtdb(), `sessions/${sessionId}/answers/${questionIndex}/${playerId}`);
   const answer: Answer = { selectedIndex, timeMs };
-  await set(answerRef, answer);
+  
+  console.log('🔥 Writing to path:', `sessions/${sessionId}/answers/${questionIndex}/${playerId}`);
+  console.log('🔥 Answer data:', answer);
+  
+  try {
+    console.log('🔥 Calling set() for answer...');
+    await set(answerRef, answer);
+    console.log('✅ Answer recorded successfully');
+  } catch (err) {
+    console.error('❌ Caught error in set():', typeof err, err);
+    // Log all properties of the error
+    if (err && typeof err === 'object') {
+      console.error('❌ Error properties:', Object.keys(err));
+      console.error('❌ Error object:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+    const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+    const errorCode = (err as { code?: string }).code;
+    console.error('❌ Failed to record answer:', { errorMessage, errorCode, errorType: typeof err });
+    throw new Error(`Failed to record answer: ${errorMessage || 'Unknown'} (${errorCode || 'no code'})`);
+  }
 
   // Update player's last answer
-  await update(ref(getRtdb(), `sessions/${sessionId}/players/${playerId}`), {
-    lastAnswer: selectedIndex,
-    answerTime: timeMs,
-  });
+  try {
+    const playerUpdateRef = ref(getRtdb(), `sessions/${sessionId}/players/${playerId}`);
+    const playerUpdate = {
+      lastAnswer: selectedIndex,
+      answerTime: timeMs,
+    };
+    console.log('🔥 Updating player at path:', `sessions/${sessionId}/players/${playerId}`);
+    console.log('🔥 Player update data:', playerUpdate);
+    await update(playerUpdateRef, playerUpdate);
+    console.log('✅ Player last answer updated');
+  } catch (err) {
+    const errorDetails = err instanceof Error ? { message: err.message, name: err.name } : { raw: String(err) };
+    console.error('❌ Caught error in update():', typeof err, err);
+    if (err && typeof err === 'object') {
+      console.error('❌ Error properties:', Object.keys(err));
+      console.error('❌ Error object:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+    const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+    const errorCode = (err as { code?: string }).code;
+    console.error('❌ Failed to update player:', { errorMessage, errorCode, errorType: typeof err });
+    throw new Error(`Failed to update player: ${errorMessage || 'Unknown'} (${errorCode || 'no code'})`);
+  }
 
-  await updateLastActivity(sessionId);
+  // Note: We don't update lastActivity here because only the host (non-anonymous) can update the session root
+  // The activity timestamp is already updated by the host when they change game state
+  console.log('✅ submitAnswer completed');
 }
 
 // Get all answers for a question
