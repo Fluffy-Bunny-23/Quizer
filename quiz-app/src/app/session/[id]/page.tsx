@@ -458,7 +458,14 @@ export default function HostSession() {
       {/* Header */}
       <header className="border-b border-card-border">
         <div className="flex justify-between items-center p-4 max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-primary">⚡ Quizer</h1>
+          <h1
+            onClick={() => router.push('/dashboard')}
+            className="text-2xl font-bold text-primary cursor-pointer flex items-center gap-2 hover:opacity-80 transition-opacity"
+            aria-label="Quizer - Go to dashboard"
+          >
+            <img src="/icon.svg" alt="" className="w-7 h-7" />
+            Quizer
+          </h1>
           <div className="flex items-center gap-4">
             <div
               className="flex items-center gap-2 bg-card-bg border border-card-border px-4 py-2 rounded-lg cursor-pointer hover:bg-primary/10 transition-colors"

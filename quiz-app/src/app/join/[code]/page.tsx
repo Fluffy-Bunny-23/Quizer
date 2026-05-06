@@ -169,7 +169,14 @@ export default function JoinGame() {
           <Icon path={mdiArrowLeft} size={1} aria-hidden="true" />
           <span>Back</span>
         </button>
-        <h1 className="text-2xl font-bold text-primary">⚡ Quizer</h1>
+        <h1
+          onClick={() => router.push('/dashboard')}
+          className="text-2xl font-bold text-primary cursor-pointer flex items-center gap-2 hover:opacity-80 transition-opacity"
+          aria-label="Quizer - Go to dashboard"
+        >
+          <img src="/icon.svg" alt="" className="w-7 h-7" />
+          Quizer
+        </h1>
         <ThemeToggle />
       </header>
 

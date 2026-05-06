@@ -315,10 +315,10 @@ export default function Dashboard() {
       <header className="border-b border-card-border">
         <div className="flex justify-between items-center p-4 max-w-6xl mx-auto">
           <h1
-            className="text-2xl font-bold text-primary cursor-pointer"
-            onClick={() => router.push('/')}
+            className="text-2xl font-bold text-primary flex items-center gap-2"
           >
-            ⚡ Quizer
+            <img src="/icon.svg" alt="" className="w-7 h-7" />
+            Quizer
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-foreground/70 hidden sm:block">
