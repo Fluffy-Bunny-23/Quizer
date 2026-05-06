@@ -24,6 +24,7 @@ function NewSessionContent() {
   const [error, setError] = useState('');
   const [mode, setMode] = useState<GameMode>('manual');
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
+  const [questionsPerSession, setQuestionsPerSession] = useState(50);
 
   useEffect(() => {
     if (!loading && !isHost) {
@@ -76,7 +77,7 @@ function NewSessionContent() {
       const { waitForFirebaseInit } = await import('@/lib/firebase');
       await waitForFirebaseInit();
 
-      const sessionCode = await createSession(user.uid, quiz.id!, mode, shuffleQuestions, quiz.questions.length);
+      const sessionCode = await createSession(user.uid, quiz.id!, mode, shuffleQuestions, quiz.questions.length, questionsPerSession);
       router.push(`/session/${sessionCode}`);
     } catch (err) {
       console.error('Error creating session:', err);
@@ -170,6 +171,31 @@ function NewSessionContent() {
                 </p>
               </button>
             </div>
+          </div>
+
+          {/* Questions Per Session */}
+          <div className="mb-4">
+            <label className="flex items-center gap-3 p-4 rounded-xl border-2 border-card-border transition-all">
+              <div className="flex-1">
+                <span className="font-semibold block">Questions Per Session</span>
+                <span className="text-sm text-foreground/70">
+                  Total quiz has {quiz.questions.length} questions. Pick a random subset for each session.
+                </span>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={questionsPerSession}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= 50) {
+                    setQuestionsPerSession(val);
+                  }
+                }}
+                className="w-20 h-10 rounded-lg border border-card-border bg-card-bg text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </label>
           </div>
 
           {/* Shuffle Questions Option */}

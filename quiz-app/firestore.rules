@@ -10,13 +10,13 @@ service cloud.firestore {
       allow create: if request.auth != null 
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.questions.size() <= 100;
+                    && request.resource.data.questions.size() <= 1000;
       
       // Only the owner can update their quiz
       allow update: if request.auth != null 
                     && resource.data.ownerUid == request.auth.uid
                     && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.questions.size() <= 100;
+                    && request.resource.data.questions.size() <= 1000;
       
       // Only the owner can delete their quiz
       allow delete: if request.auth != null 

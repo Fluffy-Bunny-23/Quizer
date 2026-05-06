@@ -255,8 +255,9 @@ export default function HostSession() {
     
     setIsNextQuestion(true);
     try {
+      const totalQuestions = session.questionOrder?.length ?? quiz.questions.length;
       const operation = async () => {
-        if (session.currentQuestionIndex >= quiz.questions.length - 1) {
+        if (session.currentQuestionIndex >= totalQuestions - 1) {
           await endGame(sessionId);
           showToast('Game finished!', 'success');
         } else {
@@ -608,7 +609,7 @@ export default function HostSession() {
             {/* Question Display */}
             <div className="card mb-6">
               <div className="text-sm text-foreground/50 mb-2">
-                Question {session.currentQuestionIndex + 1} of {quiz?.questions.length}
+                Question {session.currentQuestionIndex + 1} of {session.questionOrder?.length ?? quiz?.questions.length}
               </div>
               <h2 className="text-3xl font-bold text-center mb-4">{currentQuestion.question}</h2>
               {currentQuestion.image && (
@@ -660,7 +661,7 @@ export default function HostSession() {
           <div className="animate-fade-in">
             <div className="card mb-6">
               <div className="text-sm text-foreground/50 mb-2">
-                Question {session.currentQuestionIndex + 1} of {quiz?.questions.length}
+                Question {session.currentQuestionIndex + 1} of {session.questionOrder?.length ?? quiz?.questions.length}
               </div>
               <h2 className="text-3xl font-bold text-center mb-4">{currentQuestion.question}</h2>
               {currentQuestion.image && (

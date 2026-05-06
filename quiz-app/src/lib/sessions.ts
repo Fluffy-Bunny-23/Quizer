@@ -42,15 +42,25 @@ export async function createSession(
   quizId: string,
   mode: GameMode = 'manual',
   shuffleQuestions: boolean = false,
-  questionCount: number = 0
+  questionCount: number = 0,
+  questionsPerSession: number = questionCount
 ): Promise<string> {
   const code = await generateSessionCode();
   const sessionRef = ref(getRtdb(), `sessions/${code}`);
 
-  // Generate question order (shuffled or sequential)
-  const questionOrder = shuffleQuestions
-    ? shuffleArray(Array.from({ length: questionCount }, (_, i) => i))
-    : Array.from({ length: questionCount }, (_, i) => i);
+  // Clamp questionsPerSession to valid range
+  const actualCount = Math.max(1, Math.min(questionsPerSession, questionCount));
+
+  // Generate the full set of indices
+  let indices = Array.from({ length: questionCount }, (_, i) => i);
+
+  // If we need fewer questions than available, randomly select a subset
+  if (actualCount < questionCount) {
+    indices = shuffleArray(indices).slice(0, actualCount);
+  }
+
+  // If shuffle is enabled, shuffle the (possibly subset) indices
+  const questionOrder = shuffleQuestions ? shuffleArray(indices) : indices;
 
   const session: Session = {
     hostUid,

@@ -20,7 +20,8 @@ import {
 } from '@mdi/js';
 import { ImageUpload } from '@/components/ImageUpload';
 
-const MAX_QUESTIONS = 100;
+const MAX_QUESTIONS = 1000;
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const DEFAULT_TIME_LIMIT = 20;
 
 const emptyQuestion: Question = {
@@ -140,6 +141,12 @@ export default function NewQuiz() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 1MB.`);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
