@@ -89,7 +89,7 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex flex-col items-center justify-center px-4 py-12" role="main">
         <div className="text-center mb-12 animate-slide-in">
-          <h2 className="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <h2 className="text-5xl md:text-6xl font-extrabold mb-4 text-primary">
             Live Quiz Games
           </h2>
           <p className="text-xl text-foreground/70 max-w-xl mx-auto">
@@ -178,7 +178,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="text-center py-8 text-foreground/50 text-sm" role="contentinfo">
-        <p>Built with ⚡ Next.js and Firebase</p>
+        <p>Built with Next.js and Firebase</p>
       </footer>
     </div>
   );
