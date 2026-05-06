@@ -30,8 +30,8 @@ if (typeof window !== 'undefined' && isConfigured) {
     db = getFirestore(app);
     rtdb = getDatabase(app);
     
-    // Connect to emulators in development
-    if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+    // Connect to emulators when explicitly enabled
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
       try {
         connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
         connectFirestoreEmulator(db, 'localhost', 8080);
