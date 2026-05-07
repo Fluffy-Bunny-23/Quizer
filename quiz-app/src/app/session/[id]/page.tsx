@@ -146,7 +146,7 @@ export default function HostSession() {
     const currentQuestion = quiz.questions[actualIndex];
     await calculateScores(
       sessionId,
-      actualIndex,
+      session.currentQuestionIndex, // use display index to match where players store answers
       currentQuestion.correctIndices,
       currentQuestion.timeLimit
     );
@@ -196,7 +196,7 @@ export default function HostSession() {
     const playerList = Object.values(players).filter(p => p.role === 'player');
     if (playerList.length === 0) return;
     
-    const answeredCount = playerList.filter(p => p.lastAnswer !== null).length;
+    const answeredCount = playerList.filter(p => p.lastAnswer != null).length;
     
     if (answeredCount === playerList.length && answeredCount > 0) {
       // All players answered, auto-advance after 1 second
@@ -634,8 +634,8 @@ export default function HostSession() {
 
             {/* Answer Count */}
             <div className="text-center mb-6" aria-live="polite">
-              <span className="text-xl" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null).length} of ${playerList.length} players answered`}>
-                {Object.values(players).filter((p) => p.lastAnswer !== null).length} / {playerList.length} answered
+              <span className="text-xl" aria-label={`${Object.values(players).filter((p) => p.lastAnswer != null).length} of ${playerList.length} players answered`}>
+                {Object.values(players).filter((p) => p.lastAnswer != null).length} / {playerList.length} answered
               </span>
             </div>
 
@@ -696,12 +696,12 @@ export default function HostSession() {
 
             {/* Stats */}
             <div className="text-center mb-6" aria-live="polite">
-              <span className="text-xl text-success" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct answers`}>
-                {Object.values(players).filter((p) => p.lastAnswer !== null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct
+              <span className="text-xl text-success" aria-label={`${Object.values(players).filter((p) => p.lastAnswer != null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct answers`}>
+                {Object.values(players).filter((p) => p.lastAnswer != null && currentQuestion.correctIndices.includes(p.lastAnswer)).length} correct
               </span>
               <span className="mx-4 text-foreground/50" aria-hidden="true">|</span>
-              <span className="text-xl text-error" aria-label={`${Object.values(players).filter((p) => p.lastAnswer !== null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect answers`}>
-                {Object.values(players).filter((p) => p.lastAnswer !== null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect
+              <span className="text-xl text-error" aria-label={`${Object.values(players).filter((p) => p.lastAnswer != null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect answers`}>
+                {Object.values(players).filter((p) => p.lastAnswer != null && !currentQuestion.correctIndices.includes(p.lastAnswer)).length} incorrect
               </span>
             </div>
 
