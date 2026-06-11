@@ -4,6 +4,20 @@ import { Providers } from "./providers";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Bebas_Neue, Inter } from "next/font/google";
+
+const bebasNeue = Bebas_Neue({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-display",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-body",
+});
 
 export const metadata: Metadata = {
   title: "Quizer - Live Quiz Platform",
@@ -17,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased" suppressHydrationWarning>
+      <body className={`${bebasNeue.variable} ${inter.variable} antialiased`} suppressHydrationWarning>
         <ErrorBoundary>
           <Providers>{children}</Providers>
         </ErrorBoundary>
