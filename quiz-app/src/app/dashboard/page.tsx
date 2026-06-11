@@ -11,7 +11,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { cleanupOldSessions } from '@/lib/sessions';
-import { Quiz } from '@/types';
+import { Quiz, AuthUser } from '@/types';
 import { sanitizeQuizImport } from '@/lib/utils';
 import Icon from '@mdi/react';
 import {
@@ -186,7 +186,7 @@ export default function Dashboard() {
     fileInputRef.current?.click();
   };
 
-  const importSingleQuiz = async (quizData: any, user: any) => {
+  const importSingleQuiz = async (quizData: Record<string, unknown>, user: AuthUser) => {
     // Sanitize the quiz data before saving
     const { sanitized } = sanitizeQuizImport(quizData);
     
@@ -196,7 +196,7 @@ export default function Dashboard() {
       title: sanitized.title,
       description: sanitized.description || '',
       createdAt: serverTimestamp(),
-      questions: sanitized.questions.map((q: any) => ({
+      questions: (sanitized.questions as Array<Record<string, unknown>>).map((q: Record<string, unknown>) => ({
         question: q.question,
         options: q.options,
         correctIndices: q.correctIndices,
@@ -205,7 +205,7 @@ export default function Dashboard() {
     });
   };
 
-  const validateQuiz = (quiz: any, index?: number): string | null => {
+  const validateQuiz = (quiz: Record<string, unknown>, index?: number): string | null => {
     const prefix = index !== undefined ? `Quiz ${index + 1}: ` : '';
     if (!quiz.title || !Array.isArray(quiz.questions)) {
       return `${prefix}Invalid quiz format`;
@@ -228,7 +228,7 @@ export default function Dashboard() {
       const text = await file.text();
       const importedData = JSON.parse(text);
 
-      let quizzesToImport: any[] = [];
+      let quizzesToImport: Record<string, unknown>[] = [];
 
       // Check if it's a multi-quiz export format
       if (importedData.quizzes && Array.isArray(importedData.quizzes)) {

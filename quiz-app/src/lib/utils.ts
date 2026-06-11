@@ -99,9 +99,9 @@ export function containsXSSPatterns(input: string): boolean {
  * Validates and sanitizes imported quiz data
  * Checks for XSS patterns in all text fields and returns sanitized quiz object
  */
-export function sanitizeQuizImport(quiz: any): { sanitized: any; errors: string[] } {
+export function sanitizeQuizImport(quiz: Record<string, unknown>): { sanitized: Record<string, unknown>; errors: string[] } {
   const errors: string[] = [];
-  const sanitized: any = {};
+  const sanitized: Record<string, unknown> = {};
   
   // Validate and sanitize title
   if (!quiz.title || typeof quiz.title !== 'string') {
@@ -131,8 +131,8 @@ export function sanitizeQuizImport(quiz: any): { sanitized: any; errors: string[
   if (!Array.isArray(quiz.questions)) {
     errors.push('Missing or invalid questions array');
   } else {
-    sanitized.questions = quiz.questions.map((q: any, index: number) => {
-      const sanitizedQuestion: any = {};
+    sanitized.questions = quiz.questions.map((q: Record<string, unknown>, index: number) => {
+      const sanitizedQuestion: Record<string, unknown> = {};
       
       // Validate question text
       if (!q.question || typeof q.question !== 'string') {
@@ -148,7 +148,7 @@ export function sanitizeQuizImport(quiz: any): { sanitized: any; errors: string[
       if (!Array.isArray(q.options)) {
         errors.push(`Question ${index + 1}: Missing or invalid options`);
       } else {
-        sanitizedQuestion.options = q.options.map((opt: any, optIndex: number) => {
+        sanitizedQuestion.options = q.options.map((opt: unknown, optIndex: number) => {
           if (typeof opt !== 'string') {
             errors.push(`Question ${index + 1}, Option ${optIndex + 1}: Invalid option format`);
             return '';
@@ -162,7 +162,7 @@ export function sanitizeQuizImport(quiz: any): { sanitized: any; errors: string[
       
       // Copy correct indices (validate they are numbers)
       if (Array.isArray(q.correctIndices)) {
-        sanitizedQuestion.correctIndices = q.correctIndices.filter((i: any) => 
+        sanitizedQuestion.correctIndices = q.correctIndices.filter((i: unknown) => 
           typeof i === 'number' && Number.isInteger(i) && i >= 0
         );
       } else {

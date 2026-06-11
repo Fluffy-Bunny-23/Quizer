@@ -27,7 +27,9 @@ describe('sanitizeInput', () => {
 
   it('should handle empty or null input', () => {
     expect(sanitizeInput('')).toBe('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(sanitizeInput(null as any)).toBe('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(sanitizeInput(undefined as any)).toBe('');
   });
 
@@ -64,6 +66,7 @@ describe('validateTitle', () => {
 describe('validateDescription', () => {
   it('should return null for empty description', () => {
     expect(validateDescription('')).toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(validateDescription(null as any)).toBeNull();
   });
 
@@ -184,7 +187,9 @@ describe('containsXSSPatterns', () => {
 
   it('should handle empty input', () => {
     expect(containsXSSPatterns('')).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(containsXSSPatterns(null as any)).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(containsXSSPatterns(undefined as any)).toBe(false);
   });
 });
@@ -208,8 +213,8 @@ describe('sanitizeQuizImport', () => {
 
     expect(errors).toHaveLength(0);
     expect(sanitized.title).toBe('Test Quiz');
-    expect(sanitized.questions).toHaveLength(1);
-    expect(sanitized.questions[0].options).toHaveLength(4);
+    expect(sanitized.questions as unknown[]).toHaveLength(1);
+    expect((sanitized.questions as Record<string, unknown>[])[0].options).toHaveLength(4);
   });
 
   it('should detect XSS patterns in quiz data', () => {
@@ -280,9 +285,11 @@ describe('sanitizeQuizImport', () => {
       ],
     };
 
-    const { sanitized } = sanitizeQuizImport(quiz);
+    const result = sanitizeQuizImport(quiz);
+    const { sanitized } = result;
+    const questions = sanitized.questions as Record<string, unknown>[];
 
-    expect(sanitized.questions[0].options[0]).toBe('bOption 1/b');
+    expect(questions[0].options[0]).toBe('bOption 1/b');
   });
 
   it('should clamp time limits to valid range', () => {
@@ -310,11 +317,13 @@ describe('sanitizeQuizImport', () => {
       ],
     };
 
-    const { sanitized } = sanitizeQuizImport(quiz);
+    const result = sanitizeQuizImport(quiz);
+    const { sanitized } = result;
+    const questions = sanitized.questions as Record<string, unknown>[];
 
-    expect(sanitized.questions[0].timeLimit).toBe(5); // Min
-    expect(sanitized.questions[1].timeLimit).toBe(300); // Max
-    expect(sanitized.questions[2].timeLimit).toBe(20); // Default for invalid
+    expect(questions[0].timeLimit).toBe(5); // Min
+    expect(questions[1].timeLimit).toBe(300); // Max
+    expect(questions[2].timeLimit).toBe(20); // Default for invalid
   });
 
   it('should filter invalid correct indices', () => {
@@ -330,10 +339,12 @@ describe('sanitizeQuizImport', () => {
       ],
     };
 
-    const { sanitized } = sanitizeQuizImport(quiz);
+    const result2 = sanitizeQuizImport(quiz);
+    const { sanitized: sanitized2 } = result2;
+    const questions2 = sanitized2.questions as Record<string, unknown>[];
 
     // 0 and 2 are valid non-negative integers; 'invalid', -1, and 1.5 are filtered
-    expect(sanitized.questions[0].correctIndices).toEqual([0, 2]);
+    expect(questions2[0].correctIndices).toEqual([0, 2]);
   });
 
   it('should handle empty description', () => {

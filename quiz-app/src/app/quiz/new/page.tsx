@@ -172,9 +172,9 @@ export default function NewQuiz() {
         const suspiciousFields: string[] = [];
         if (containsXSSPatterns(importedQuiz.title)) suspiciousFields.push('title');
         if (containsXSSPatterns(importedQuiz.description)) suspiciousFields.push('description');
-        importedQuiz.questions.forEach((q: any, idx: number) => {
-          if (containsXSSPatterns(q.question)) suspiciousFields.push(`question ${idx + 1}`);
-          q.options.forEach((opt: string, optIdx: number) => {
+        importedQuiz.questions.forEach((q: Record<string, unknown>, idx: number) => {
+          if (containsXSSPatterns(q.question as string)) suspiciousFields.push(`question ${idx + 1}`);
+          (q.options as string[]).forEach((opt: string, optIdx: number) => {
             if (containsXSSPatterns(opt)) suspiciousFields.push(`question ${idx + 1}, option ${optIdx + 1}`);
           });
         });
@@ -187,11 +187,11 @@ export default function NewQuiz() {
         // Set imported data with sanitization
         setTitle(sanitizeInput(importedQuiz.title, 100));
         setDescription(sanitizeInput(importedQuiz.description || '', 500));
-        setQuestions(importedQuiz.questions.map((q: any) => ({
-          question: sanitizeInput(q.question, 500),
-          options: q.options.map((o: string) => sanitizeInput(o, 200)),
+        setQuestions(importedQuiz.questions.map((q: Record<string, unknown>) => ({
+          question: sanitizeInput(q.question as string, 500),
+          options: (q.options as string[]).map((o: string) => sanitizeInput(o, 200)),
           correctIndices: q.correctIndices,
-          timeLimit: q.timeLimit || DEFAULT_TIME_LIMIT,
+          timeLimit: (q.timeLimit as number) || DEFAULT_TIME_LIMIT,
         })));
         setActiveQuestion(0);
         setError('');

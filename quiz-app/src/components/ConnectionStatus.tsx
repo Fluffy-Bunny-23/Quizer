@@ -12,7 +12,10 @@ interface ConnectionStatusProps {
 type ConnectionState = 'online' | 'offline' | 'reconnecting';
 
 export function ConnectionStatus({ onRetry, retryCount = 0 }: ConnectionStatusProps) {
-  const [state, setState] = useState<ConnectionState>('online');
+  const [state, setState] = useState<ConnectionState>(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return 'offline';
+    return 'online';
+  });
   const [isVisible, setIsVisible] = useState(false);
 
   const handleOnline = useCallback(() => {
@@ -32,19 +35,13 @@ export function ConnectionStatus({ onRetry, retryCount = 0 }: ConnectionStatusPr
       try {
         await onRetry();
         handleOnline();
-      } catch (error) {
+      } catch {
         setState('offline');
       }
     }
   }, [onRetry, handleOnline]);
 
   useEffect(() => {
-    // Check initial state
-    if (!navigator.onLine) {
-      setState('offline');
-      setIsVisible(true);
-    }
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
@@ -103,7 +100,9 @@ export function ConnectionStatus({ onRetry, retryCount = 0 }: ConnectionStatusPr
 
 // Hook for tracking connection status
 export function useConnectionStatus() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
   const [retryCount, setRetryCount] = useState(0);
 
   const retry = useCallback(async (operation: () => Promise<void>) => {
@@ -112,7 +111,7 @@ export function useConnectionStatus() {
       await operation();
       setRetryCount(0);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }, []);
@@ -120,8 +119,6 @@ export function useConnectionStatus() {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
-    setIsOnline(navigator.onLine);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);

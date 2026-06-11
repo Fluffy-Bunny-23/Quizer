@@ -363,15 +363,17 @@ export async function cleanupOldSessions(maxAgeHours: number = 24): Promise<void
 
   if (!snapshot.exists()) return;
 
-  const sessions = snapshot.val();
+  const sessions = snapshot.val() as Record<string, Record<string, unknown>> | null;
   const now = Date.now();
   const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
 
   const updates: Record<string, null> = {};
 
-  Object.entries(sessions).forEach(([sessionId, session]: [string, any]) => {
+  if (!sessions) return;
+
+  Object.entries(sessions).forEach(([sessionId, session]) => {
     // Check if session is finished or too old
-    const lastActivity = session.lastActivity || session.questionStartTime || 0;
+    const lastActivity = (session.lastActivity as number) || (session.questionStartTime as number) || 0;
     const isFinished = session.status === 'finished';
     const isOld = now - lastActivity > maxAgeMs;
 
